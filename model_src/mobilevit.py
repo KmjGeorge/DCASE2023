@@ -344,13 +344,14 @@ def mobilevit_s():
 def mobileast_xxs():
     dims = [64, 80, 96]
     channels = [16, 16, 24, 24, 48, 48, 64, 64, 80, 80, 320]
-    return MobileAST((128, 32), dims, channels, num_classes=10, expansion=2, kernel_size=(3, 3), patch_size=(2, 2))
+    # 频谱参数改变导致输入维度改变的时候，这里(128, 64)也要随之改变
+    return MobileAST((128, 64), dims, channels, num_classes=10, expansion=2, kernel_size=(3, 3), patch_size=(2, 2))
 
 
 def mobileast_s():
     dims = [144, 192, 240]
     channels = [16, 32, 64, 64, 96, 96, 128, 128, 160, 160, 640]
-    return MobileAST((128, 32), dims, channels, num_classes=10, kernel_size=(3, 3), patch_size=(2, 2))
+    return MobileAST((128, 64), dims, channels, num_classes=10, kernel_size=(3, 3), patch_size=(2, 2))
 
 
 def count_parameters(model):
@@ -369,4 +370,4 @@ if __name__ == '__main__':
 
     # 评估模型参数量和MACC
     from size_cal import nessi
-    nessi.get_model_size(vit, 'torch', input_size=(1, 1, 128, 64))
+    nessi.get_model_size(vit, 'torch', input_size=(64, 1, 128, 64))

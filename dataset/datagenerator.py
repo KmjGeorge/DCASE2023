@@ -1,6 +1,4 @@
-import random
 import torch
-import torch.nn.functional as F
 import pandas as pd
 import librosa
 import librosa.feature
@@ -93,8 +91,7 @@ class TAU2022(Dataset):
                         self.X.append(data)
                         Y.append(TAU2022_CLASSES[label])  # 标签转数字
                 loop.set_description('从h5加载tau2022数据集...')
-        # 转独热码
-        self.Y = F.one_hot(torch.tensor(Y))
+        self.Y = torch.tensor(Y)
 
     def __len__(self):
         return len(self.X)
@@ -118,7 +115,7 @@ def make_tau2022(meta_path, h5_path):
         audio, _ = librosa.load(full_path, sr=SR)
         X.append(audio)
         Y.append(scene_label)
-        loop.set_description('读取tau2022数据集...')
+        loop.set_description('从audio文件读取tau2022数据集...')
 
     loop2 = tqdm(range(len(X)))
     for i in loop2:
@@ -194,8 +191,7 @@ class TAU2022_Random_Slicing(Dataset):
                         self.X.append(data)
                         Y.append(TAU2022_CLASSES[label])  # 标签转数字
                 loop.set_description('从h5加载random_slicing数据集...')
-        # 转独热码
-        self.Y = F.one_hot(torch.tensor(Y))
+        self.Y = torch.tensor(Y)
 
     def __len__(self):
         return len(self.X)
@@ -228,9 +224,9 @@ def get_tau2022():
     train_h5 = os.path.join(H5PATH, 'tau2022_train.h5')
     test_h5 = os.path.join(H5PATH, 'tau2022_test.h5')
     TAU2022_train = TAU2022(train_h5)
-    print('len(TAU2022_train)=', len(TAU2022_train))  # 139620
+    # print('len(TAU2022_train)=', len(TAU2022_train))  # 139620
     TAU2022_test = TAU2022(test_h5)
-    print('len(TAU2022_test)=', len(TAU2022_test))  # 29680
+    # print('len(TAU2022_test)=', len(TAU2022_test))  # 29680
     train = DataLoader(TAU2022_train, batch_size=BATCH_SIZE, shuffle=SHUFFLE)
     test = DataLoader(TAU2022_test, batch_size=BATCH_SIZE, shuffle=False)
     return train, test
@@ -241,9 +237,9 @@ def get_tau2022_random_slicing():
     train_h5 = SLICING_H5PATH
     test_h5 = os.path.join(H5PATH, 'tau2022_test.h5')
     TAU2022_random_slicing_train = TAU2022_Random_Slicing(train_h5)
-    print('len(slicing_train)=', len(TAU2022_random_slicing_train))  # 139620
+    # print('len(slicing_train)=', len(TAU2022_random_slicing_train))  # 139620
     TAU2022_test = TAU2022(test_h5)
-    print('len(slicing_test)=', len(TAU2022_test))  # 29680
+    # print('len(slicing_test)=', len(TAU2022_test))  # 29680
     train = DataLoader(TAU2022_random_slicing_train, batch_size=BATCH_SIZE, shuffle=SHUFFLE)
     test = DataLoader(TAU2022_test, batch_size=BATCH_SIZE, shuffle=False)  # 测试集
     return train, test
@@ -270,8 +266,8 @@ if __name__ == '__main__':
             break
         print(x.shape)
         print(y.shape)
-        print(x)
-        print(y)
+        # print(x)
+        # print(y)
         i += 1
 
     '''random_slicing数据集调用'''
@@ -280,13 +276,13 @@ if __name__ == '__main__':
     for x, y in Random_Slicing_train:
         if i == 1:
             break
-        print(x)
-        print(y)
         print(x.shape)
         print(y.shape)
+        # print(x)
+        # print(y)
         i += 1
 
-    ''' urbansound8k调用 测试用
+    ''' urbansound8k 测试用
     UrbanSound8K_test = UrbanSound8K(META_PATH, fold_list=[1, 2, 3, 4, 5, 6, 7, 8, 9])
     test = DataLoader(UrbanSound8K_test, batch_size=BATCH_SIZE, shuffle=False)
     i = 0

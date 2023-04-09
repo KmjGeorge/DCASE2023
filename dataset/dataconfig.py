@@ -21,7 +21,7 @@ dataset_config = {
     'h5path': 'D:/github/DCASE2023/dataset/h5/',
     'num_classes': 10,
     'shuffle': True,
-    # 当使用tau2022_random_slicing数据集时使用以下三项，否则为None
+    # 当使用tau2022_random_slicing数据集时使用以下三项，否则可以为None
     'reassembled_audio_path': 'D:/datasets/TAU-urban-acoustic-scenes-2022-mobile-development-reassembled',
     'reassembled_meta_path': 'D:/datasets/TAU-urban-acoustic-scenes-2022-mobile-development-reassembled/meta.csv',
     'slicing_h5path': 'D:/github/DCASE2023/dataset/h5/tau2022_reassembled_random_slicing.h5',

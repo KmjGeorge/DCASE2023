@@ -1,18 +1,10 @@
 import torch
-from dataset.datagenerator import get_urbansound8k
 import torch.optim as optim
 from torch.optim.lr_scheduler import CosineAnnealingLR
 from optim.scheduler import GradualWarmupScheduler
-import matplotlib.pyplot as plt
 import torch.nn as nn
-import pandas as pd
 from tqdm import tqdm
-from size_cal import nessi
-from model_src.mobilevit import mobileast_xxs, mobileast_s
-from model_src.rfr_cnn import RFR_CNN
-from model_src.cp_resnet import cp_resnet
 from dataset.augmentation import mixup
-from dataset.spectrum import ExtractMel
 from train.trainingconfig import training_config
 
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
@@ -32,9 +24,9 @@ def train(model, train_loader, test_loader, epochs, save_name, mixup_alpha, save
 
     criterion = nn.CrossEntropyLoss()
     # 先逐步增加至初始学习率，然后使用余弦退火
-    optimizer = optim.AdamW(model.parameters(), lr=1e-3, weight_decay=0.01)
-    scheduler_cos = CosineAnnealingLR(optimizer, T_max=MAX_EPOCH, eta_min=1e-4)
-    scheduler_warmup = GradualWarmupScheduler(optimizer, multiplier=1, total_epoch=3,
+    optimizer = optim.AdamW(model.parameters(), lr=1e-4, weight_decay=0.01)
+    scheduler_cos = CosineAnnealingLR(optimizer, T_max=MAX_EPOCH, eta_min=1e-5)
+    scheduler_warmup = GradualWarmupScheduler(optimizer, multiplier=1, total_epoch=int(MAX_EPOCH/10) + 1,
                                               after_scheduler=scheduler_cos)
     for i in range(epochs):
         epoch_loss, epoch_acc = train_per_epoch(

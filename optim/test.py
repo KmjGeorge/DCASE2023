@@ -9,13 +9,13 @@ MAX_EPOCH = 30
 BATCH_SIZE = 4
 if __name__ == '__main__':
     model = [torch.nn.Parameter(torch.randn(2, 2, requires_grad=True))]
-    optimizer = AdamW(model, lr=5e-4, weight_decay=0.01)
+    optimizer = AdamW(model, lr=1e-4, weight_decay=0.01)
     # optimizer = SGD(model, 0.1)
 
     # scheduler_warmup is chained with schduler_steplr
     # scheduler_steplr = StepLR(optimizer, step_size=5, gamma=0.1)
     scheduler_cos = CosineAnnealingLR(optimizer, T_max=MAX_EPOCH, eta_min=1e-5)
-    scheduler_warmup = GradualWarmupScheduler(optimizer, multiplier=1, total_epoch=3, after_scheduler=scheduler_cos)
+    scheduler_warmup = GradualWarmupScheduler(optimizer, multiplier=1, total_epoch=4, after_scheduler=scheduler_cos)
 
     optimizer.zero_grad()
     optimizer.step()

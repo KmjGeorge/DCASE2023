@@ -44,7 +44,7 @@ def save_logs(loss_list, acc_list, val_loss_list, val_acc_list):
 
 
 if __name__ == '__main__':
-    '''0. 修改以下配置'''
+    '''0. 配置'''
     from dataset.dataconfig import dataset_config, spectrum_config
     from train.trainingconfig import training_config
 
@@ -63,16 +63,16 @@ if __name__ == '__main__':
         model = nn.Sequential(ExtractMel(**spectrum_config), mobileast_s()).to(device)
     elif CHOOSE_MODEL == 'mobileast_xxs':
         model = nn.Sequential(ExtractMel(**spectrum_config), mobileast_xxs()).to(device)
-    elif CHOOSE_MODEL == 'RFR-CNN':
+    elif CHOOSE_MODEL == 'rfr-cnn':
         model = nn.Sequential(ExtractMel(**spectrum_config), RFR_CNN().to(device))
     else:
         raise '未定义的模型！'
 
     '''3. 计算模型大小，需指定输入形状 (batch, sr*time) '''
-    nessi.get_model_size(model, 'torch', input_size=(1, spectrum_config['sr'] * 4))
+    nessi.get_model_size(model, 'torch', input_size=(1, spectrum_config['sr'] * 1))
 
     '''4. 获取数据集'''
-    # 注意如果使用tau2022_random_slicing，请先在dataset.datagenerator中生成该数据集
+    # 请先在dataset.datagenerator中生成数据集(h5形式)
     if DATASET_NAME == 'TAU2022_RANDOM_SLICING' or DATASET_NAME == 'tau2022_random_slicing':
         train_dataloader, test_dataloader = dataset.datagenerator.get_tau2022_random_slicing()
     elif DATASET_NAME == 'TAU2022' or DATASET_NAME == 'tau2022':
@@ -82,12 +82,12 @@ if __name__ == '__main__':
     else:
         raise '未定义的数据集！'
 
-    '''5. 训练并显示曲线 训练参数存放于model_weights 文件名为task_name名
-          曲线存放于figure文件夹 文件名为task_name名'''
+    '''5. 训练并显示曲线 训练参数存放于model_weights 文件名为training_config['task_name']名
+          曲线存放于figure文件夹 文件名为training_config['task_name']名'''
     loss_list, acc_list, val_loss_list, val_acc_list = train.normal_train.train(model, train_dataloader,
                                                                                 test_dataloader,
                                                                                 epochs=MAX_EPOCH, save_name=TASK_NAME,
                                                                                 mixup_alpha=MIXUP_ALPHA,
                                                                                 save=True)
-    '''6. 保存日志 存放于logs文件夹 文件名为task_name名'''
+    '''6. 保存日志 存放于logs文件夹 文件名为training_config['task_name']名'''
     save_logs(loss_list, acc_list, val_loss_list, val_acc_list)
