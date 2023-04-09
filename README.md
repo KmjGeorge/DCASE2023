@@ -10,7 +10,7 @@
 
 ##### 	数据处理代码，包括：
 
-​	datagenerator.py  —  数据集制作（建议存储为h5，存放到dataset/h5/)
+​	datagenerator.py  —  数据集制作（建议存储为h5，直接读取音频时间过长，存放到dataset/h5/)
 
 ​	files_reassemble.ipynb,  meta_csv_reassemble.ipynb — 按去年第1方案，制作reassembled数据集(1s拼接为10s)
 
