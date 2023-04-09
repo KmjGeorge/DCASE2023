@@ -8,9 +8,9 @@
 
 ### /dataset
 
-##### 	数据处理代码，包括：
+##### 		数据处理代码，包括：
 
-​	datagenerator.py  —  数据集制作（建议存储为h5，直接读取音频时间过长，存放到dataset/h5/)
+​	datagenerator.py  —  数据集制作（直接读取音频时间过长，将其存储为h5，，存放到dataset/h5/)
 
 ​	files_reassemble.ipynb,  meta_csv_reassemble.ipynb — 按去年第1方案，制作reassembled数据集(1s拼接为10s)
 
@@ -22,11 +22,11 @@
 
 ### /compress 
 
-##### 		存放压缩策略
+##### 			存放压缩策略
 
 ### /model_src
 
-##### 	存放模型结构，使用的模块可以定义在/model_src/module
+##### 		存放模型结构，使用的模块可以定义在/model_src/module
 
 ​	目前定义的模型：
 
@@ -38,11 +38,11 @@
 
 ### /model_weights
 
-  ##### 			存放训练参数
+  ##### 				存放训练参数
 
 ### /optim
 
-  ##### 			自定义优化器和学习率调度器
+  ##### 				自定义优化器和学习率调度器
 
 ​	scheduler.py — 目前使用了warmup，见GradualWarmupScheduler类
 
@@ -50,7 +50,7 @@
 
 ### /train
 
-##### 		自定义训练行为
+##### 			自定义训练行为
 
 ​	normal_train.py — 普通的训练和验证（可选择mixup)
 
@@ -70,15 +70,15 @@ nessi.get_model_size(model, model_type='torch', input_size)
 
 ### /logs
 
-##### 	存放训练日志文件
+##### 		存放训练日志文件
 
 ### /figure
 
-##### 存放训练曲线和其他图
+##### 	存放训练曲线和其他图
 
 ### /run
 
-##### 		主程序
+##### 			主程序
 
 ​	run.py — 主程序示例，流程：读取配置—获取模型—计算模型大小—获取数据集—训练—保存日志
 
