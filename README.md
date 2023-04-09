@@ -22,19 +22,19 @@
 
 ### /compress 
 
-    ##### 	 存放模型压缩方法
+##### 		存放压缩策略
 
 ### /model_src
 
-	##### 	存放模型结构，使用的模块可以定义在/model_src/module
+##### 	存放模型结构，使用的模块可以定义在/model_src/module
 
 ### /model_weights
 
-  ##### 	存放训练参数
+  ##### 			存放训练参数
 
 ### /optim
 
-  ##### 	自定义优化器和学习率更新器
+  ##### 			自定义优化器和学习率调度器
 
 ​	scheduler.py — 目前使用了warmup，见GradualWarmupScheduler类
 
@@ -42,7 +42,7 @@
 
 ### /train
 
-##### 	自定义训练行为
+##### 		自定义训练行为
 
 ​	normal_train.py — 普通的训练和验证（可选择mixup)
 
@@ -52,7 +52,7 @@
 
 ### /size_cal
 
-​	官方提供的计算模型大小的工具，用法：
+##### 官方提供的计算模型大小的工具，用法：
 
 ```python
 from size_cal import nessi
@@ -62,17 +62,13 @@ nessi.get_model_size(model, model_type='torch', input_size)
 
 ### /logs
 
-​	存放训练日志文件
+##### 	存放训练日志文件
 
 ### /run
 
-     ##### 	主程序
+##### 		主程序
 
-​	run.py — 主程序示例，流程：
-
-​    读取配置—获取模型—计算模型大小—获取数据集—训练—保存日志
-
-
+​	run.py — 主程序示例，流程：读取配置—获取模型—计算模型大小—获取数据集—训练—保存日志
 
 
 

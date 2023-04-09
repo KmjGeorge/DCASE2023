@@ -14,6 +14,8 @@ if __name__ == '__main__':
 
     # scheduler_warmup is chained with schduler_steplr
     # scheduler_steplr = StepLR(optimizer, step_size=5, gamma=0.1)
+
+    # 先逐步增加至初始学习率，然后使用余弦退火
     scheduler_cos = CosineAnnealingLR(optimizer, T_max=MAX_EPOCH, eta_min=1e-5)
     scheduler_warmup = GradualWarmupScheduler(optimizer, multiplier=1, total_epoch=4, after_scheduler=scheduler_cos)
 
