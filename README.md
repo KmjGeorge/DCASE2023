@@ -127,13 +127,13 @@ Random_Slicing_train, Random_Slicing_test = get_tau2022_random_slicing()  	# 获
 
 ## IV. 继续添加模块
 
-​	新增数据集请在**/dataset/datagenerator.py**中加入新的类；新增数据增强方案请添加到**augmentation.py**；新增频谱提取策略和增强方案请添加到**spectrum.py**（为了方便，封装为网络输入层，参考ExtractMel类，继承nn.Module类）
+​	新增数据集请在/dataset/datagenerator.py中加入新的类；新增数据增强方案请添加到augmentation.py；新增频谱提取策略和增强方案请添加到spectrum.py（为了方便，封装为网络输入层，参考ExtractMel类，继承nn.Module类）
 
-​	新增模型请添加到**/model_src**，如果有预训练权重放到**model_weights/pretrained**
+​	新增模型请添加到/model_src，如果有预训练权重放到model_weights/pretrained
 
-​	新增优化器或lr调度器请添加到**/optim**
+​	新增优化器或lr调度器请添加到/optim
 
-​	新增自定义训练行为（如蒸馏）请添加到**/train**
+​	新增自定义训练行为（如蒸馏）请添加到/train
 
 
 
