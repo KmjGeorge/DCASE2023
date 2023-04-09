@@ -123,17 +123,17 @@ class ExtractMel(nn.Module):
 if __name__ == '__main__':
     from dataconfig import spectrum_config
     # 测试
-    ext = ExtractMel(**spectrum_config)
+    extmel = ExtractMel(**spectrum_config)
     batch = []
-    x1, _ = librosa.load('D:/Datasets/UrbanSound8K/audio/fold1/7383-3-0-0.wav', sr=spectrum_config['sr'])
-    x2, _ = librosa.load('D:/Datasets/UrbanSound8K/audio/fold1/7383-3-0-1.wav', sr=spectrum_config['sr'])
+    x1, _ = librosa.load('D:/Datasets/TAU-urban-acoustic-scenes-2022-mobile-development/audio/airport-barcelona-0-0-0-a.wav', sr=spectrum_config['sr'])
+    x2, _ = librosa.load('D:/Datasets/TAU-urban-acoustic-scenes-2022-mobile-development/audio/airport-barcelona-0-0-1-a.wav', sr=spectrum_config['sr'])
     print(x1.shape)
     plot_waveform(x1[np.newaxis, ...], sample_rate=spectrum_config['sr'])
     batch.append(x1)
     batch.append(x2)
     batch = torch.tensor(batch)
-    print(batch.shape)  # (b, sr*time)
-    batch = ext(batch)
-    print(batch.shape)  # (b, n_mels, sr*time // hop_length 向上取整)
+    print(batch.shape)  # (batchsize, sr*time)
+    batch = extmel(batch)
+    print(batch.shape)    # (batchsize, C, F, T)  其中C=1, F=n_mels, T=sr*time // hop_length 向上取整
     plot_spectrogram(batch[0])
 

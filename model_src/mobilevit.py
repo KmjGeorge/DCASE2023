@@ -1,6 +1,7 @@
 import torch
 import torch.nn as nn
 from einops import rearrange
+import numpy as np
 
 device = 'cuda' if torch.cuda.is_available() else 'cpu'
 
@@ -296,29 +297,29 @@ class MobileAST(nn.Module):
         self.fc = nn.Linear(channels[-1], num_classes, bias=False)
         self.softmax = nn.Softmax(dim=1)
 
-    def forward(self, x):  # input:(b, 1, 128, 128)
+    def forward(self, x):
         # print('x.shape=', x.shape)
-        x = self.conv1(x)  # (b, 16, 64, 64)
-        x = self.mv2[0](x)  # (b, 32, 64, 64)
+        x = self.conv1(x)
+        x = self.mv2[0](x)
 
-        x = self.mv2[1](x)  # (b, 64, 32, 32)
-        x = self.mv2[2](x)  # (b, 64, 32, 32)
-        x = self.mv2[3](x)  # Repeat  # (b, 64, 32, 32)
+        x = self.mv2[1](x)
+        x = self.mv2[2](x)
+        x = self.mv2[3](x)
 
-        x = self.mv2[4](x)  # (b, 96, 16, 16)
-        x = self.mvit[0](x)  # (b, 96, 16, 16)
+        x = self.mv2[4](x)
+        x = self.mvit[0](x)
 
-        x = self.mv2[5](x)  # (b, 128, 8, 8)
-        x = self.mvit[1](x)  # (b, 128, 8, 8)
+        x = self.mv2[5](x)
+        x = self.mvit[1](x)
 
-        x = self.mv2[6](x)  # (b, 160, 4, 4)
-        x = self.mvit[2](x)  # (b, 160, 4, 4)
+        x = self.mv2[6](x)
+        x = self.mvit[2](x)
 
-        x = self.conv2(x)  # (b, 640, 4, 4)
-        x = self.pool(x)  # (b, 640, 1, 1)
-        x = x.view(-1, x.shape[1])  # (b, 640)
+        x = self.conv2(x)
+        x = self.pool(x)
+        x = x.view(-1, x.shape[1])
 
-        x = self.fc(x)  # (b, 10)
+        x = self.fc(x)
         return x
 
 
@@ -343,13 +344,13 @@ def mobilevit_s():
 def mobileast_xxs():
     dims = [64, 80, 96]
     channels = [16, 16, 24, 24, 48, 48, 64, 64, 80, 80, 320]
-    return MobileAST((128, 128), dims, channels, num_classes=10, expansion=2, kernel_size=(3, 3), patch_size=(2, 2))
+    return MobileAST((128, 32), dims, channels, num_classes=10, expansion=2, kernel_size=(3, 3), patch_size=(2, 2))
 
 
 def mobileast_s():
     dims = [144, 192, 240]
     channels = [16, 32, 64, 64, 96, 96, 128, 128, 160, 160, 640]
-    return MobileAST((128, 128), dims, channels, num_classes=10, kernel_size=(3, 3), patch_size=(2, 2))
+    return MobileAST((128, 32), dims, channels, num_classes=10, kernel_size=(3, 3), patch_size=(2, 2))
 
 
 def count_parameters(model):
@@ -368,5 +369,4 @@ if __name__ == '__main__':
 
     # 评估模型参数量和MACC
     from size_cal import nessi
-
-    nessi.get_model_size(vit, 'torch', input_size=(1, 1, 256, 64))
+    nessi.get_model_size(vit, 'torch', input_size=(1, 1, 128, 64))

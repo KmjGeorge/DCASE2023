@@ -42,12 +42,8 @@ import torch.nn.functional as F
 # df = pd.read_csv('G:\datasets\TAU-urban-acoustic-scenes-2022-mobile-development\evaluation_setup\\fold1_train.csv', sep='\t')
 # small_df = df[0:800]
 # small_df.to_csv('G:\datasets\TAU-urban-acoustic-scenes-2022-mobile-development\evaluation_setup\\fold1_train_small.csv', index_label=False)
-
-labels = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 0, 1, 2, 3, 4, 5, 6, 7, 8, 8, 8, 8, 8, 9]
-labels = torch.tensor(labels)
-print(labels)
-one_hot = F.one_hot(labels)
-print(one_hot)
-print(one_hot[1])
+meta_new = "D:/datasets/TAU-urban-acoustic-scenes-2022-mobile-development-reassembled/meta.csv"
+print(os.path.split(meta_new)[0])
+os.mkdir(os.path.join(os.path.split(meta_new)[0], 'evaluation_setup'))
 
 
