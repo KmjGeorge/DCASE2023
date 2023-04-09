@@ -246,7 +246,7 @@ def get_tau2022_random_slicing():
 
 
 if __name__ == '__main__':
-    # 以H5制作TAU2022数据集
+    # 以H5制作TAU2022原版数据集，存放到dataconfig['h5_ath']
     train_h5 = os.path.join(H5PATH, 'tau2022_train.h5')
     test_h5 = os.path.join(H5PATH, 'tau2022_test.h5')
     train_csv = os.path.split(META_PATH)[0] + '/evaluation_setup/fold1_train.csv'
@@ -254,13 +254,14 @@ if __name__ == '__main__':
     make_tau2022(train_csv, train_h5)
     make_tau2022(test_csv, test_h5)
 
-    # 根据reassemble的数据集生成10s随机采样为若干1s的数据集，以h5形式存放到dataconfig['slicing_h5_path']
+    # 以H5制作根据reassemble的数据集生成10s随机采样为若干1s的数据集，存放到dataconfig['slicing_h5_path']
     # 在此之前，请先运行dataset/files_reassemble.ipynb和dataset/meta_csv_reassemble.ipynb 以制作reassemble数据集，
     make_tau2022_reassemble_random_slicing(n=10)  # 参数n为随机采样的次数，最后得到的数据集为原数据集的n倍
 
-    '''原版TAU2022数据集调用'''
+    '''原版TAU2022数据集调用
     TAU2022_train, TAU2022_test = get_tau2022()
     i = 0
+    # 输出一批数据的shape
     for x, y in TAU2022_train:
         if i == 1:
             break
@@ -269,10 +270,12 @@ if __name__ == '__main__':
         # print(x)
         # print(y)
         i += 1
+    '''
 
-    '''random_slicing数据集调用'''
+    '''random_slicing数据集调用
     Random_Slicing_train, Random_Slicing_test = get_tau2022_random_slicing()
     i = 0
+    # 输出一批数据的shape
     for x, y in Random_Slicing_train:
         if i == 1:
             break
@@ -281,12 +284,12 @@ if __name__ == '__main__':
         # print(x)
         # print(y)
         i += 1
+    '''
 
     ''' urbansound8k 测试用
-    UrbanSound8K_test = UrbanSound8K(META_PATH, fold_list=[1, 2, 3, 4, 5, 6, 7, 8, 9])
-    test = DataLoader(UrbanSound8K_test, batch_size=BATCH_SIZE, shuffle=False)
+    Urbansound8k_train, UrbanSound8K_test = get_urbansound8k(fold_shuffle)
     i = 0
-    for x, y in test:
+    for x, y in Urbansound8k_train:
         if i == 1:
             break
         print(x)
