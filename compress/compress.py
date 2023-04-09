@@ -1,5 +1,4 @@
-# 模型压缩
 
 # TODO
-def quantilization(model):
+def quantization(model):
     pass
