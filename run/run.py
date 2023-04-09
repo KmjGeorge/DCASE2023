@@ -13,7 +13,7 @@ import train.normal_train
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
 
-def show_accloss(loss_list, acc_list, val_loss_list, val_acc_list, name):
+def show_accloss(loss_list, acc_list, val_loss_list, val_acc_list):
     x = [i + 1 for i in range(len(loss_list))]
 
     plt.plot(x, loss_list, label='training loss')
@@ -21,7 +21,7 @@ def show_accloss(loss_list, acc_list, val_loss_list, val_acc_list, name):
     plt.xlabel('Epochs')
     plt.ylabel('Loss')
     plt.legend()
-    plt.savefig('../figure/{}_loss.jpg'.format(name, name))
+    plt.savefig('../figure/{}_loss.jpg'.format(TASK_NAME))
     plt.show()
 
     plt.plot(x, acc_list, label='training acc')
@@ -29,7 +29,7 @@ def show_accloss(loss_list, acc_list, val_loss_list, val_acc_list, name):
     plt.xlabel('Epochs')
     plt.ylabel('Acc')
     plt.legend()
-    plt.savefig('../figure/{}_acc.jpg'.format(name, name))
+    plt.savefig('../figure/{}_acc.jpg'.format(TASK_NAME))
     plt.show()
 
 
@@ -40,7 +40,7 @@ def save_logs(loss_list, acc_list, val_loss_list, val_acc_list):
                          'val_acc': val_acc_list}
                         )
     logs.to_csv('../logs/{}_logs.csv'.format(TASK_NAME), index_label=True)
-    show_accloss(loss_list, acc_list, val_loss_list, val_acc_list, name=TASK_NAME)
+    show_accloss(loss_list, acc_list, val_loss_list, val_acc_list)
 
 
 if __name__ == '__main__':
@@ -82,12 +82,14 @@ if __name__ == '__main__':
     else:
         raise '未定义的数据集！'
 
-    '''5. 训练并显示曲线 训练参数存放于model_weights 文件名为training_config['task_name']名
-          曲线存放于figure文件夹 文件名为training_config['task_name']名'''
+    '''5. 训练 参数存放于model_weights 文件名为training_config['task_name']名'''
+
     loss_list, acc_list, val_loss_list, val_acc_list = train.normal_train.train(model, train_dataloader,
                                                                                 test_dataloader,
                                                                                 epochs=MAX_EPOCH, save_name=TASK_NAME,
                                                                                 mixup_alpha=MIXUP_ALPHA,
                                                                                 save=True)
-    '''6. 保存日志 存放于logs文件夹 文件名为training_config['task_name']名'''
+    '''6. 保存日志 绘制曲线
+    曲线存放于figure文件夹 文件名为training_config['task_name']名
+    日志存放于logs文件夹 文件名为training_config['task_name']名'''
     save_logs(loss_list, acc_list, val_loss_list, val_acc_list)
