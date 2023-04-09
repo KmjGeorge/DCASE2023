@@ -71,7 +71,7 @@ class BasicBlock(nn.Module):
 
 
 class RFR_CNN(nn.Module):
-    def __init__(self, in_channels=1, num_class=10, rho=7):  # input (1, 256, 64)
+    def __init__(self, in_channels=1, num_class=10, rho=7):  # if input (1, 256, 64)
         super(RFR_CNN, self).__init__()
 
         # stage1

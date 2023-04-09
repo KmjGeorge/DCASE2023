@@ -66,15 +66,17 @@ class ExtractMel(nn.Module):
         else:
             self.fmax = kwargs['fmax']
         self.hop_length = kwargs['hop_length']
-        self.register_buffer('window',
-                             torch.hann_window(kwargs['win_length'], periodic=False),
-                             persistent=False)
-        # assert kwargs['fmin_aug_range'] >= 1, f"fmin_aug_range={fmin_aug_range} should be >=1; 1 means no augmentation"
-        # assert kwargs['fmax_aug_range'] >= 1, f"fmax_aug_range={fmax_aug_range} should be >=1; 1 means no augmentation"
+
+
         self.fmin_aug_range = kwargs['fmin_aug_range']
         self.fmax_aug_range = kwargs['fmax_aug_range']
+        assert kwargs['fmin_aug_range'] >= 1, f"fmin_aug_range={self.fmin_aug_range} should be >=1; 1 means no augmentation"
+        assert kwargs['fmax_aug_range'] >= 1, f"fmax_aug_range={self.fmax_aug_range} should be >=1; 1 means no augmentation"
 
-        self.register_buffer("preemphasis_coefficient", torch.as_tensor([[[-.97, 1]]]), persistent=False)
+        self.register_buffer('window',
+                             torch.hann_window(kwargs['win_length'], periodic=False),  # Hann窗，窗长为win_length
+                             persistent=False)
+        self.register_buffer("preemphasis_coefficient", torch.as_tensor([[[-.97, 1]]]), persistent=False)  # 预加重参数
         if kwargs['freqm'] == 0:
             self.freqm = torch.nn.Identity()
         else:
@@ -94,7 +96,7 @@ class ExtractMel(nn.Module):
         fmin = self.fmin + torch.randint(self.fmin_aug_range, (1,)).item()
         fmax = self.fmax + self.fmax_aug_range // 2 - torch.randint(self.fmax_aug_range, (1,)).item()
 
-        # don't augment eval data
+        # 只在训练时使用mel滤波器组的随机偏移
         if not self.training:
             fmin = self.fmin
             fmax = self.fmax
@@ -107,9 +109,9 @@ class ExtractMel(nn.Module):
         with torch.cuda.amp.autocast(enabled=False):
             melspec = torch.matmul(mel_basis, x)
 
-        melspec = (melspec + 0.00001).log()
+        melspec = (melspec + 0.00001).log()  # 防止0
 
-        if self.training:
+        if self.training:  # 只在训练时采用specaugment
             melspec = self.freqm(melspec)
             melspec = self.timem(melspec)
 
@@ -120,7 +122,7 @@ class ExtractMel(nn.Module):
 
 if __name__ == '__main__':
     from dataconfig import spectrum_config
-
+    # 测试
     ext = ExtractMel(**spectrum_config)
     batch = []
     x1, _ = librosa.load('D:/Datasets/UrbanSound8K/audio/fold1/7383-3-0-0.wav', sr=spectrum_config['sr'])
@@ -132,6 +134,6 @@ if __name__ == '__main__':
     batch = torch.tensor(batch)
     print(batch.shape)  # (b, sr*time)
     batch = ext(batch)
-    print(batch.shape)  # (b, n_mels, sr*time // hop_length)
+    print(batch.shape)  # (b, n_mels, sr*time // hop_length 向上取整)
     plot_spectrogram(batch[0])
 

@@ -1,6 +1,10 @@
+'''
+随便测试点什么
+'''
 import os
 import numpy as np
 import torch
+import torch.nn.functional as F
 
 # path = 'G:/datasets/TAU-urban-acoustic-scenes-2022-mobile-development/meta.csv'
 # print(os.path.split(path))
@@ -34,7 +38,16 @@ import torch
 # for a, b in zip(x, y):
 #     print(a, b)
 
-import pandas as pd
-df = pd.read_csv('G:\datasets\dcase22_task1\TAU-urban-acoustic-scenes-2022-mobile-development\evaluation_setup\\fold1_train.csv', sep='\t')
-print(len(df[df['scene_label'] == 'airport']))
+# import pandas as pd
+# df = pd.read_csv('G:\datasets\TAU-urban-acoustic-scenes-2022-mobile-development\evaluation_setup\\fold1_train.csv', sep='\t')
+# small_df = df[0:800]
+# small_df.to_csv('G:\datasets\TAU-urban-acoustic-scenes-2022-mobile-development\evaluation_setup\\fold1_train_small.csv', index_label=False)
+
+labels = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 0, 1, 2, 3, 4, 5, 6, 7, 8, 8, 8, 8, 8, 9]
+labels = torch.tensor(labels)
+print(labels)
+one_hot = F.one_hot(labels)
+print(one_hot)
+print(one_hot[1])
+
 
