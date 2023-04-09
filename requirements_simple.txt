@@ -1,0 +1,14 @@
+h5py
+matplotlib
+einop
+numpy
+pandas
+librosa
+soundfile
+torch
+torchaudio
+torchinfo
+torchsummary
+torchtoolbox
+torchvision
+tqdm
