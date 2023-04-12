@@ -3,6 +3,8 @@ import dataset.datagenerator
 import matplotlib.pyplot as plt
 import torch.nn as nn
 import pandas as pd
+import random
+import numpy as np
 from size_cal import nessi
 from model_src.mobilevit import mobileast_xxs, mobileast_s
 from model_src.rfr_cnn import RFR_CNN
@@ -45,10 +47,20 @@ def save_logs(loss_list, acc_list, val_loss_list, val_acc_list):
     show_accloss(loss_list, acc_list, val_loss_list, val_acc_list)
 
 
+def setup_seed(seed):
+    torch.manual_seed(seed)
+    torch.cuda.manual_seed_all(seed)
+    np.random.seed(seed)
+    random.seed(seed)
+    torch.backends.cudnn.deterministic = True
+
+
 if __name__ == '__main__':
     '''0. 配置'''
     from dataset.dataconfig import dataset_config, spectrum_config
     from train.trainingconfig import training_config
+    # 固定种子
+    setup_seed(200)
 
     '''1. 读取参数'''
     MAX_EPOCH = training_config['epoch']

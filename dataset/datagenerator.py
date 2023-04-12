@@ -12,7 +12,6 @@ import random
 import numpy as np
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-torch.manual_seed(0)
 
 DATASET_NAME = dataset_config['name']
 NUM_CLASSES = dataset_config['num_classes']
