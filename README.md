@@ -117,6 +117,7 @@ nessi.get_model_size(model, model_type='torch', input_size)
 #### 4、自行训练如何获取数据集
 
 ```python
+from dataset.datagenerator import get_tau2022, get_tau2022_random_slicing
 # 调用前确保dataconfig.py/dataset_config中的参数正确
 TAU2022_train, TAU2022_test = get_tau2022()  # 获得原版TAU2022数据集
 Random_Slicing_train, Random_Slicing_test = get_tau2022_random_slicing()  	# 获得切片版TAU2022数据集
