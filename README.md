@@ -2,13 +2,25 @@
 
 施工中……
 
+requirements.txt是自动导出的完整环境，存在冗余和未使用的包
+
+requirements_simple.txt为项目主要使用的包，可能有遗漏，导入到工程缺哪个再装哪个
+
+此外需安装hear21passt，原项目地址https://github.com/kkoutini/passt_hear21
+
+或用以下命令安装
+
+```
+pip install -e 'git+https://github.com/kkoutini/passt_hear21@0.0.19#egg=hear21passt' 
+```
+
 
 
 ## I. 文件结构
 
 ### /dataset
 
-##### 		数据处理代码，包括：
+##### 		数据处理，包括：
 
 ​	datagenerator.py  —  数据集制作（直接读取音频时间过长，将其存储为h5，，存放到dataset/h5/)
 
