@@ -7,6 +7,8 @@ from size_cal import nessi
 from model_src.mobilevit import mobileast_xxs, mobileast_s
 from model_src.rfr_cnn import RFR_CNN
 from model_src.cp_resnet import cp_resnet
+from model_src.passt import passt
+from model_src.acdnet import GetACDNetModel
 from dataset.spectrum import ExtractMel
 import train.normal_train
 
@@ -60,11 +62,15 @@ if __name__ == '__main__':
     if CHOOSE_MODEL == 'cp_resnet':
         model = nn.Sequential(ExtractMel(**spectrum_config), cp_resnet()).to(device)
     elif CHOOSE_MODEL == 'mobileast_s':
-        model = nn.Sequential(ExtractMel(**spectrum_config), mobileast_s()).to(device)
+        model = nn.Sequential(ExtractMel(**spectrum_config), mobileast_s(mixstyle=True)).to(device)
     elif CHOOSE_MODEL == 'mobileast_xxs':
-        model = nn.Sequential(ExtractMel(**spectrum_config), mobileast_xxs()).to(device)
+        model = nn.Sequential(ExtractMel(**spectrum_config), mobileast_xxs(mixstyle=True)).to(device)
     elif CHOOSE_MODEL == 'rfr-cnn':
         model = nn.Sequential(ExtractMel(**spectrum_config), RFR_CNN().to(device))
+    elif CHOOSE_MODEL == 'passt':
+        model = passt().to(device)
+    elif CHOOSE_MODEL == 'acdnet':
+        model = GetACDNetModel(input_len=32000, nclass=10, sr=spectrum_config['sr'])
     else:
         raise '未定义的模型！'
 

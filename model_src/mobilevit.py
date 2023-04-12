@@ -2,6 +2,7 @@ import torch
 import torch.nn as nn
 from einops import rearrange
 import numpy as np
+from model_src.module.mixstyle import MixStyle
 
 device = 'cuda' if torch.cuda.is_available() else 'cpu'
 
@@ -267,13 +268,17 @@ class MobileViT(nn.Module):
 
 
 class MobileAST(nn.Module):
-    def __init__(self, spec_size, dims, channels, num_classes, expansion=4, kernel_size=(3, 3), patch_size=(2, 2)):
+    def __init__(self, spec_size, dims, channels, num_classes, expansion=4, kernel_size=(3, 3), patch_size=(2, 2), mixstyle=False):
         super().__init__()
         ih, iw = spec_size[0], spec_size[1]
         ph, pw = patch_size[0], patch_size[1]
         assert ih % ph == 0 and iw % pw == 0
 
         L = [2, 4, 3]
+        if mixstyle:
+            self.mixstyle = MixStyle(p=0.5, alpha=0.1)
+        else:
+            self.mixstyle = None
 
         self.conv1 = conv_nxn_bn(1, channels[0], stride=2)
 
@@ -305,9 +310,13 @@ class MobileAST(nn.Module):
         x = self.mv2[1](x)
         x = self.mv2[2](x)
         x = self.mv2[3](x)
+        if self.mixstyle:
+            x = self.mixstyle(x)
 
         x = self.mv2[4](x)
         x = self.mvit[0](x)
+        if self.mixstyle:
+            x = self.mixstyle(x)
 
         x = self.mv2[5](x)
         x = self.mvit[1](x)
@@ -341,27 +350,25 @@ def mobilevit_s():
     return MobileViT((256, 256), dims, channels, num_classes=1000)
 
 
-def mobileast_xxs():
+def mobileast_xxs(mixstyle):
     dims = [64, 80, 96]
     channels = [16, 16, 24, 24, 48, 48, 64, 64, 80, 80, 320]
     # 频谱参数改变导致输入维度改变的时候，这里(128, 64)也要随之改变
-    return MobileAST((128, 64), dims, channels, num_classes=10, expansion=2, kernel_size=(3, 3), patch_size=(2, 2))
+    return MobileAST((128, 64), dims, channels, num_classes=10, expansion=2, kernel_size=(3, 3), patch_size=(2, 2), mixstyle=mixstyle)
 
 
-def mobileast_s():
+def mobileast_s(mixstyle):
     dims = [144, 192, 240]
     channels = [16, 32, 64, 64, 96, 96, 128, 128, 160, 160, 640]
-    return MobileAST((128, 64), dims, channels, num_classes=10, kernel_size=(3, 3), patch_size=(2, 2))
+    return MobileAST((128, 64), dims, channels, num_classes=10, kernel_size=(3, 3), patch_size=(2, 2), mixstyle=mixstyle)
 
 
-def count_parameters(model):
-    return sum(p.numel() for p in model.parameters() if p.requires_grad)
 
 
 if __name__ == '__main__':
     # img = torch.randn(5, 3, 256, 256).to('cuda')
 
-    vit = mobileast_xxs().to(device)
+    model = mobileast_xxs(mixstyle=True).to(device)
     # out = vit(img)
     # print(out.shape)
     # print(count_parameters(vit))
@@ -370,4 +377,4 @@ if __name__ == '__main__':
 
     # 评估模型参数量和MACC
     from size_cal import nessi
-    nessi.get_model_size(vit, 'torch', input_size=(64, 1, 128, 64))
+    nessi.get_model_size(model, 'torch', input_size=(64, 1, 128, 64))

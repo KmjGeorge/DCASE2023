@@ -28,6 +28,7 @@ def train(model, train_loader, test_loader, epochs, save_name, mixup_alpha, save
     scheduler_cos = CosineAnnealingLR(optimizer, T_max=MAX_EPOCH, eta_min=1e-5)
     scheduler_warmup = GradualWarmupScheduler(optimizer, multiplier=1, total_epoch=int(MAX_EPOCH/10) + 1,
                                               after_scheduler=scheduler_cos)
+    scheduler_warmup.step()  # 学习率从0开始，跳过第一轮
     for i in range(epochs):
         epoch_loss, epoch_acc = train_per_epoch(
             model=model,
