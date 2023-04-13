@@ -53,7 +53,6 @@ def passt(n_classes=10, mixstyle=False):
     else:
         model.net = passt
     model.train()
-
     return model
 
 
