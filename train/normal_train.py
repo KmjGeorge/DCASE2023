@@ -6,8 +6,11 @@ import torch.nn as nn
 from tqdm import tqdm
 from dataset.augmentation import mixup
 from train.trainingconfig import training_config
+import pandas as pd
 
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+
+
 
 MAX_EPOCH = training_config['epoch']
 TASK_NAME = training_config['task_name']
@@ -16,7 +19,8 @@ CHOOSE_MODEL = training_config['model']
 
 
 # 定义普通的训练过程，mixup_alpha为mixup参数，0不启用
-def train(model, train_loader, test_loader, epochs, save_name, mixup_alpha, save=True):
+
+def train(model, train_loader, test_loader, start_epoch, epochs, save_name, mixup_alpha, save=True):
     loss_list = []
     acc_list = []
     val_loss_list = []
@@ -35,7 +39,8 @@ def train(model, train_loader, test_loader, epochs, save_name, mixup_alpha, save
             train_loader=train_loader,
             criterion=criterion,
             optimizer=optimizer,
-            scheduler=scheduler_warmup,
+            scheduler=scheduler_cos,
+            start_epoch=start_epoch,
             epoch=i,
             epochs=epochs,
             save_name=save_name,
@@ -51,15 +56,21 @@ def train(model, train_loader, test_loader, epochs, save_name, mixup_alpha, save
         acc_list.append(epoch_acc)
         val_loss_list.append(test_epoch_loss)
         val_acc_list.append(test_epoch_acc)
+        if save:
+            logs = pd.DataFrame({'loss': epoch_loss,
+                                 'acc': acc_list,
+                                 'val_loss': val_loss_list,
+                                 'val_acc': val_acc_list}
+                                )
+            logs.to_csv('../logs/{}_logs.csv'.format(TASK_NAME), index_label=True, mode='a')
     print('==========Finished Training===========')
 
     if save:
         torch.save(model, '../model_weights/{}_final.pt'.format(save_name))
-        print('=========Finished Saving============')
     return loss_list, acc_list, val_loss_list, val_acc_list
 
 
-def train_per_epoch(model, train_loader, criterion, optimizer, scheduler, epoch, epochs, save_name, mixup_alpha=0,
+def train_per_epoch(model, train_loader, criterion, optimizer, scheduler, start_epoch, epoch, epochs, save_name, mixup_alpha=0,
                     save=True):
     correct = 0
     total = 0
@@ -104,13 +115,13 @@ def train_per_epoch(model, train_loader, criterion, optimizer, scheduler, epoch,
             running_acc = correct / total
 
         # 输出训练信息
-        loop.set_description(f'Epoch [{epoch + 1}/{epochs}]')
+        loop.set_description(f'Epoch [{start_epoch + epoch + 1}/{epochs}]')
         loop.set_postfix(lr=lr, loss=running_loss, acc=running_acc)
     scheduler.step()  # 更新学习率
     epoch_loss = sum_loss / total
     epoch_acc = correct / total
     if save:
-        torch.save(model.state_dict(), "../model_weights/{}_epoch{}.pt".format(save_name, epoch + 1))  # 每轮保存一次便于调试
+        torch.save(model.state_dict(), "../model_weights/{}_epoch{}.pt".format(save_name, start_epoch + epoch + 1))  # 每轮保存一次便于调试
     return epoch_loss, epoch_acc
 
 

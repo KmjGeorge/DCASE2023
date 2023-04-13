@@ -101,10 +101,14 @@ if __name__ == '__main__':
         raise '未定义的数据集！'
 
     '''5. 训练 参数存放于model_weights 文件名为training_config['task_name']名'''
-
+    # 如果是断点续训
+    weights = torch.load('../model_weights/passt_tau2022_random_slicing_augment_mixup_epoch3.pt')
+    model.load_state_dict(weights)
     loss_list, acc_list, val_loss_list, val_acc_list = train.normal_train.train(model, train_dataloader,
                                                                                 test_dataloader,
-                                                                                epochs=MAX_EPOCH, save_name=TASK_NAME,
+                                                                                epochs=MAX_EPOCH,
+                                                                                start_epoch=3,
+                                                                                save_name=TASK_NAME,
                                                                                 mixup_alpha=MIXUP_ALPHA,
                                                                                 save=True)
     '''6. 保存日志 绘制曲线
