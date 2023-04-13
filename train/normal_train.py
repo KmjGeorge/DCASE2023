@@ -28,18 +28,19 @@ def train(model, train_loader, test_loader, start_epoch, epochs, save_name, mixu
 
     criterion = nn.CrossEntropyLoss()
     # 先逐步增加至初始学习率，然后使用余弦退火
-    optimizer = optim.AdamW(model.parameters(), lr=1e-4, weight_decay=0.01)
-    scheduler_cos = CosineAnnealingLR(optimizer, T_max=MAX_EPOCH, eta_min=1e-5)
+    optimizer = optim.AdamW(model.parameters(), lr=1e-3, weight_decay=0.01)
+    scheduler_cos = CosineAnnealingLR(optimizer, T_max=MAX_EPOCH, eta_min=1e-6)
     scheduler_warmup = GradualWarmupScheduler(optimizer, multiplier=1, total_epoch=int(MAX_EPOCH/10) + 1,
                                               after_scheduler=scheduler_cos)
     scheduler_warmup.step()  # 学习率从0开始，跳过第一轮
+
     for i in range(epochs):
         epoch_loss, epoch_acc = train_per_epoch(
             model=model,
             train_loader=train_loader,
             criterion=criterion,
             optimizer=optimizer,
-            scheduler=scheduler_cos,
+            scheduler=scheduler_warmup,
             start_epoch=start_epoch,
             epoch=i,
             epochs=epochs,
@@ -62,7 +63,7 @@ def train(model, train_loader, test_loader, start_epoch, epochs, save_name, mixu
                                  'val_loss': val_loss_list,
                                  'val_acc': val_acc_list}
                                 )
-            logs.to_csv('../logs/{}_logs.csv'.format(TASK_NAME), index_label=True, mode='a')
+            logs.to_csv('../logs/{}_logs.csv'.format(TASK_NAME), index=True, mode='a')
     print('==========Finished Training===========')
 
     if save:

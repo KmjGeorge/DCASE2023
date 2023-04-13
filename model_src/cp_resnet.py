@@ -284,66 +284,7 @@ class Network(nn.Module):
                 torch.quantization.fuse_modules(m[1], ['0', '1'], inplace=True)
 
 
-'''
-def cp_resnet():
-    rho = 4
-    in_channels = 1
-    arch = "cp_resnet"
-    n_classes = 10
-    base_channels = 32
-    cut_channels_s2 = 0
-    cut_channels_s3 = 0
-    channels_multiplier = 2
-    n_blocks = (2, 2, 2)
-    s1_group = 1
-    s2_group = 1
-    s3_group = 1
-
-    extra_kernal_rf = rho - 4
-
-    model_config = {
-        "arch": arch,
-        "base_channels": base_channels,
-        "cut_channels_s2": cut_channels_s2,
-        "cut_channels_s3": cut_channels_s3,
-        "channels_multiplier": channels_multiplier,
-        "input_shape": [
-            1,
-            in_channels,
-            -1,
-            -1
-        ],
-        "n_blocks_per_stage": n_blocks,
-        "n_classes": n_classes,
-        "stage1": {"maxpool": [0, 1, 2, 4],
-                   "k1s": [3,
-                           3 - (-extra_kernal_rf > 2) * 2],
-                   "k2s": [1,
-                           3 - (-extra_kernal_rf > 1) * 2],
-                   "groups": s1_group},
-
-        "stage2": {"maxpool": [], "k1s": [3 - (-extra_kernal_rf > 0) * 2,
-                                          1 + (extra_kernal_rf > 1) * 2],
-                   "k2s": [1 + (extra_kernal_rf > 0) * 2,
-                           1 + (extra_kernal_rf > 2) * 2],
-                   "groups": s2_group},
-
-        "stage3": {"maxpool": [],
-                   "k1s": [1 + (extra_kernal_rf > 3) * 2,
-                           1 + (extra_kernal_rf > 5) * 2],
-                   "k2s": [1 + (extra_kernal_rf > 4) * 2,
-                           1 + (extra_kernal_rf > 6) * 2],
-                   "groups": s3_group},
-        "block_type": "basic"
-    }
-
-    model = Network(model_config)
-
-    return model
-'''
-
-
-def cp_resnet():
+def cp_resnet(mixstyle=False):
     rho = 4
     in_channels = 1
     arch = "cp_resnet"
@@ -396,6 +337,7 @@ def cp_resnet():
     }
 
     from model_src.module.mixstyle import MixStyle
-    model = nn.Sequential(MixStyle(p=0.5, alpha=0.1, freq=True), Network(model_config))
-
-    return model
+    if mixstyle:
+        return nn.Sequential(MixStyle(p=0.5, alpha=0.1, freq=True), Network(model_config))
+    else:
+        return Network(model_config)

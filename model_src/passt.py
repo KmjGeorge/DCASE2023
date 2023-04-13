@@ -1,9 +1,11 @@
 from hear21passt.base import get_basic_model, get_model_passt, load_model
 import torch
 import torch.nn.functional as F
+import torch.nn as nn
+from module.mixstyle import MixStyle
 
 
-def passt(n_classes=10):
+def passt(n_classes=10, mixstyle=False):
     model = get_basic_model(mode="logits")  # model包含model.mel和model.net 分别是输入特征提取层和主干网络
     ''' # model.mel默认为
     AugmentMelSTFT(n_mels=128, sr=32000, win_length=800, hopsize=320, n_fft=1024, freqm=48,
@@ -48,12 +50,15 @@ def passt(n_classes=10):
 
     model.net = passt
     model.train()
-    return model
+    if mixstyle:
+        return nn.Sequential(MixStyle(p=0.5, alpha=0.1, freq=True), model)
+    else:
+        return model
 
 
 if __name__ == '__main__':
     from size_cal import nessi
+
     model = passt(10)
     param = model.net.state_dict()
     nessi.get_model_size(model, 'torch', input_size=(1, 32000))
-
