@@ -2,7 +2,7 @@ from hear21passt.base import get_basic_model, get_model_passt, load_model
 import torch
 import torch.nn.functional as F
 import torch.nn as nn
-from module.mixstyle import MixStyle
+from model_src.module.mixstyle import MixStyle
 
 
 def passt(n_classes=10, mixstyle=False):
