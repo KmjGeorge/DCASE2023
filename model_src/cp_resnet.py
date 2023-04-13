@@ -156,11 +156,11 @@ class Network(nn.Module):
             nn.ReLU(True)
         )
         self.stage1 = self._make_stage(
-            n_channels[0], n_channels[0], n_blocks_per_stage[0], BasicBlock,  maxpool=config['stage1']['maxpool'],
+            n_channels[0], n_channels[0], n_blocks_per_stage[0], BasicBlock, maxpool=config['stage1']['maxpool'],
             k1s=config['stage1']['k1s'], k2s=config['stage1']['k2s'], groups=config['stage1']['groups'], )
         self.stage2 = self._make_stage(
             n_channels[0], n_channels[1], n_blocks_per_stage[1], BasicBlock, maxpool=config['stage2']['maxpool'],
-            k1s=config['stage2']['k1s'], k2s=config['stage2']['k2s'], groups=config['stage2']['groups'],)
+            k1s=config['stage2']['k1s'], k2s=config['stage2']['k2s'], groups=config['stage2']['groups'], )
         if n_blocks_per_stage[2] == 0:
             self.stage3 = nn.Sequential()
             n_channels[2] = n_channels[1]
@@ -168,7 +168,7 @@ class Network(nn.Module):
         else:
             self.stage3 = self._make_stage(
                 n_channels[1], n_channels[2], n_blocks_per_stage[2], BasicBlock, maxpool=config['stage3']['maxpool'],
-                k1s=config['stage3']['k1s'], k2s=config['stage3']['k2s'], groups=config['stage3']['groups'],)
+                k1s=config['stage3']['k1s'], k2s=config['stage3']['k2s'], groups=config['stage3']['groups'], )
 
         # sets width_per_block
         self.width_per_block = n_channels
@@ -199,7 +199,7 @@ class Network(nn.Module):
         self.apply(initialize_weights_fixup)
 
     def _make_stage(self, in_channels, out_channels, n_blocks, block, maxpool=None, k1s=(3, 3, 3, 3, 3, 3),
-                    k2s=(3, 3, 3, 3, 3, 3), groups=1,):
+                    k2s=(3, 3, 3, 3, 3, 3), groups=1, ):
         """
 
         @param in_channels: in channels to the stage
@@ -221,7 +221,7 @@ class Network(nn.Module):
             stage.add_module('block{}'.format(index + 1),
                              block(in_channels,
                                    out_channels,
-                                   k1=k1s[index], k2=k2s[index], groups=groups,))
+                                   k1=k1s[index], k2=k2s[index], groups=groups, ))
 
             in_channels = out_channels
             # if index + 1 in maxpool:
@@ -284,6 +284,7 @@ class Network(nn.Module):
                 torch.quantization.fuse_modules(m[1], ['0', '1'], inplace=True)
 
 
+'''
 def cp_resnet():
     rho = 4
     in_channels = 1
@@ -337,5 +338,64 @@ def cp_resnet():
     }
 
     model = Network(model_config)
+
+    return model
+'''
+
+
+def cp_resnet():
+    rho = 4
+    in_channels = 1
+    arch = "cp_resnet"
+    n_classes = 10
+    base_channels = 32
+    cut_channels_s2 = 0
+    cut_channels_s3 = 0
+    channels_multiplier = 2
+    n_blocks = (2, 2, 2)
+    s1_group = 1
+    s2_group = 1
+    s3_group = 1
+
+    extra_kernal_rf = rho - 4
+
+    model_config = {
+        "arch": arch,
+        "base_channels": base_channels,
+        "cut_channels_s2": cut_channels_s2,
+        "cut_channels_s3": cut_channels_s3,
+        "channels_multiplier": channels_multiplier,
+        "input_shape": [
+            1,
+            in_channels,
+            -1,
+            -1
+        ],
+        "n_blocks_per_stage": n_blocks,
+        "n_classes": n_classes,
+        "stage1": {"maxpool": [0, 1, 2, 4],
+                   "k1s": [3,
+                           3 - (-extra_kernal_rf > 2) * 2],
+                   "k2s": [1,
+                           3 - (-extra_kernal_rf > 1) * 2],
+                   "groups": s1_group},
+
+        "stage2": {"maxpool": [], "k1s": [3 - (-extra_kernal_rf > 0) * 2,
+                                          1 + (extra_kernal_rf > 1) * 2],
+                   "k2s": [1 + (extra_kernal_rf > 0) * 2,
+                           1 + (extra_kernal_rf > 2) * 2],
+                   "groups": s2_group},
+
+        "stage3": {"maxpool": [],
+                   "k1s": [1 + (extra_kernal_rf > 3) * 2,
+                           1 + (extra_kernal_rf > 5) * 2],
+                   "k2s": [1 + (extra_kernal_rf > 4) * 2,
+                           1 + (extra_kernal_rf > 6) * 2],
+                   "groups": s3_group},
+        "block_type": "basic"
+    }
+
+    from model_src.module.mixstyle import MixStyle
+    model = nn.Sequential(MixStyle(p=0.5, alpha=0.1, freq=True), Network(model_config))
 
     return model
