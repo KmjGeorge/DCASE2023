@@ -57,13 +57,14 @@ class MixStyle(nn.Module):
       Zhou et al. Domain Generalization with MixStyle. ICLR 2021.
     """
 
-    def __init__(self, p=0.5, alpha=0.1, eps=1e-6, mix="random"):
+    def __init__(self, p=0.5, alpha=0.1, eps=1e-6, mix="random", freq=False):
         """
         Args:
           p (float): probability of using MixStyle.
           alpha (float): parameter of the Beta distribution.
           eps (float): scaling parameter to avoid numerical issues.
           mix (str): how to mix.
+          新增参数 freq: 是否是在频率上使用mixstyle, 默认false为通道上的mixstyle
         """
         super().__init__()
         self.p = p
@@ -72,6 +73,7 @@ class MixStyle(nn.Module):
         self.alpha = alpha
         self.mix = mix
         self._activated = True
+        self.freq = freq
 
     def __repr__(self):
         return (
@@ -92,9 +94,12 @@ class MixStyle(nn.Module):
             return x
 
         B = x.size(0)
-
-        mu = x.mean(dim=[2, 3], keepdim=True)
-        var = x.var(dim=[2, 3], keepdim=True)
+        if self.freq:
+            mu = x.mean(dim=[1, 3], keepdim=True)
+            var = x.var(dim=[1, 3], keepdim=True)
+        else:
+            mu = x.mean(dim=[2, 3], keepdim=True)
+            var = x.var(dim=[2, 3], keepdim=True)
         sig = (var + self.eps).sqrt()
         mu, sig = mu.detach(), sig.detach()
         x_normed = (x-mu) / sig
@@ -122,3 +127,4 @@ class MixStyle(nn.Module):
         sig_mix = sig*lmda + sig2 * (1-lmda)
 
         return x_normed*sig_mix + mu_mix
+

@@ -3,8 +3,12 @@ import torch.nn as nn
 from einops import rearrange
 import numpy as np
 from model_src.module.mixstyle import MixStyle
+from model_src.module.ssn import SubSpecNormalization
 
 device = 'cuda' if torch.cuda.is_available() else 'cpu'
+
+# 子谱数
+SubSpecNum = 2
 
 
 def conv_1x1_bn(inp, oup):
@@ -19,6 +23,22 @@ def conv_nxn_bn(inp, oup, kernal_size=3, stride=1):
     return nn.Sequential(
         nn.Conv2d(inp, oup, kernal_size, stride, 1, bias=False),
         nn.BatchNorm2d(oup),
+        nn.SiLU()
+    )
+
+
+def conv_1x1_ssn(inp, oup, S):
+    return nn.Sequential(
+        nn.Conv2d(inp, oup, 1, 1, 0, bias=False),
+        SubSpecNormalization(oup, S=S),
+        nn.SiLU()
+    )
+
+
+def conv_nxn_ssn(inp, oup, S, kernal_size=3, stride=1):
+    return nn.Sequential(
+        nn.Conv2d(inp, oup, kernal_size, stride, 1, bias=False),
+        SubSpecNormalization(oup, S=S),
         nn.SiLU()
     )
 
@@ -141,6 +161,54 @@ class MV2Block(nn.Module):
             return self.conv(x)
 
 
+class MV2Block_SSN(nn.Module):
+    '''
+    :param inp 输入通道
+    :param oup 输出通道
+    :param stride 当stride=1，且输入通道=输出通道时才有shotcut
+    :param expansion 扩展因子
+    '''
+
+    def __init__(self, inp, oup, stride=1, expansion=4):
+        super().__init__()
+        self.stride = stride
+        assert stride in [1, 2]
+
+        hidden_dim = int(inp * expansion)
+        self.use_res_connect = self.stride == 1 and inp == oup
+
+        if expansion == 1:
+            self.conv = nn.Sequential(
+                # dw
+                nn.Conv2d(hidden_dim, hidden_dim, 3, stride, 1, groups=hidden_dim, bias=False),
+                SubSpecNormalization(hidden_dim, S=SubSpecNum),
+                nn.SiLU(),
+                # pw-linear
+                nn.Conv2d(hidden_dim, oup, 1, 1, 0, bias=False),
+                SubSpecNormalization(oup, S=SubSpecNum),
+            )
+        else:
+            self.conv = nn.Sequential(
+                # pw
+                nn.Conv2d(inp, hidden_dim, 1, 1, 0, bias=False),
+                SubSpecNormalization(hidden_dim, S=SubSpecNum),
+                nn.SiLU(),
+                # dw
+                nn.Conv2d(hidden_dim, hidden_dim, 3, stride, 1, groups=hidden_dim, bias=False),
+                SubSpecNormalization(hidden_dim, S=SubSpecNum),
+                nn.SiLU(),
+                # pw-linear
+                nn.Conv2d(hidden_dim, oup, 1, 1, 0, bias=False),
+                SubSpecNormalization(oup, S=SubSpecNum),
+            )
+
+    def forward(self, x):
+        if self.use_res_connect:
+            return x + self.conv(x)
+        else:
+            return self.conv(x)
+
+
 class MobileViTBlock(nn.Module):
     def __init__(self, dim, depth, channel, kernel_size, patch_size, mlp_dim, dropout=0.):
         super().__init__()
@@ -152,23 +220,20 @@ class MobileViTBlock(nn.Module):
         self.transformer = Transformer(dim, depth, 4, 8, mlp_dim, dropout)
 
         self.conv3 = conv_1x1_bn(dim, channel)
-        self.conv4 = conv_nxn_bn(2 * channel, channel, kernel_size)
+        self.conv4 = conv_nxn_ssn(2 * channel, channel, kernel_size)
 
     def forward(self, x):
         y = x.clone()
 
-        # Local representations
         x = self.conv1(x)
         x = self.conv2(x)
 
-        # Global representations
         _, _, h, w = x.shape
         x = rearrange(x, 'b d (h ph) (w pw) -> b (ph pw) (h w) d', ph=self.ph, pw=self.pw)
         x = self.transformer(x)
         x = rearrange(x, 'b (ph pw) (h w) d -> b d (h ph) (w pw)', h=h // self.ph, w=w // self.pw, ph=self.ph,
                       pw=self.pw)
 
-        # Fusion
         x = self.conv3(x)
         x = torch.cat((x, y), 1)
         x = self.conv4(x)
@@ -180,13 +245,13 @@ class MobileASTBlock(nn.Module):
         super().__init__()
         self.ph, self.pw = patch_size[0], patch_size[1]
 
-        self.conv1 = conv_nxn_bn(channel, channel, kernel_size)
-        self.conv2 = conv_1x1_bn(channel, dim)
+        self.conv1 = conv_nxn_ssn(channel, channel, S=SubSpecNum, kernal_size=kernel_size)
+        self.conv2 = conv_1x1_ssn(channel, dim, S=SubSpecNum)
 
         self.transformer = Transformer(dim, depth, 4, 8, mlp_dim, dropout)
 
-        self.conv3 = conv_1x1_bn(dim, channel)
-        self.conv4 = conv_nxn_bn(2 * channel, channel, kernel_size)
+        self.conv3 = conv_1x1_ssn(dim, channel, S=SubSpecNum)
+        self.conv4 = conv_nxn_ssn(2 * channel, channel, S=SubSpecNum, kernal_size=kernel_size)
 
     def forward(self, x):
         y = x.clone()
@@ -267,8 +332,10 @@ class MobileViT(nn.Module):
         return x
 
 
+# 将BN换为SSN，并使用FreqMixStyle
 class MobileAST(nn.Module):
-    def __init__(self, spec_size, dims, channels, num_classes, expansion=4, kernel_size=(3, 3), patch_size=(2, 2), mixstyle=False):
+    def __init__(self, spec_size, dims, channels, num_classes, expansion=4, kernel_size=(3, 3), patch_size=(2, 2),
+                 mixstyle=True):
         super().__init__()
         ih, iw = spec_size[0], spec_size[1]
         ph, pw = patch_size[0], patch_size[1]
@@ -276,20 +343,20 @@ class MobileAST(nn.Module):
 
         L = [2, 4, 3]
         if mixstyle:
-            self.mixstyle = MixStyle(p=0.5, alpha=0.1)
+            self.mixstyle = MixStyle(p=0.5, alpha=0.1, freq=True)
         else:
             self.mixstyle = None
 
-        self.conv1 = conv_nxn_bn(1, channels[0], stride=2)
+        self.conv1 = conv_nxn_ssn(1, channels[0], stride=2, S=SubSpecNum)
 
         self.mv2 = nn.ModuleList([])
-        self.mv2.append(MV2Block(channels[0], channels[1], 1, expansion))
-        self.mv2.append(MV2Block(channels[1], channels[2], 2, expansion))
-        self.mv2.append(MV2Block(channels[2], channels[3], 1, expansion))
-        self.mv2.append(MV2Block(channels[2], channels[3], 1, expansion))  # Repeat
-        self.mv2.append(MV2Block(channels[3], channels[4], 2, expansion))
-        self.mv2.append(MV2Block(channels[5], channels[6], 2, expansion))
-        self.mv2.append(MV2Block(channels[7], channels[8], 2, expansion))
+        self.mv2.append(MV2Block_SSN(channels[0], channels[1], 1, expansion))
+        self.mv2.append(MV2Block_SSN(channels[1], channels[2], 2, expansion))
+        self.mv2.append(MV2Block_SSN(channels[2], channels[3], 1, expansion))
+        self.mv2.append(MV2Block_SSN(channels[2], channels[3], 1, expansion))  # Repeat
+        self.mv2.append(MV2Block_SSN(channels[3], channels[4], 2, expansion))
+        self.mv2.append(MV2Block_SSN(channels[5], channels[6], 2, expansion))
+        self.mv2.append(MV2Block_SSN(channels[7], channels[8], 2, expansion))
 
         self.mvit = nn.ModuleList([])
         self.mvit.append(MobileASTBlock(dims[0], L[0], channels[5], kernel_size, patch_size, int(dims[0] * 2)))
@@ -303,20 +370,17 @@ class MobileAST(nn.Module):
         self.softmax = nn.Softmax(dim=1)
 
     def forward(self, x):
-        # print('x.shape=', x.shape)
+        if self.mixstyle:
+            x = self.mixstyle(x)  # 只对输入作freq-mixstyle
         x = self.conv1(x)
         x = self.mv2[0](x)
 
         x = self.mv2[1](x)
         x = self.mv2[2](x)
         x = self.mv2[3](x)
-        if self.mixstyle:
-            x = self.mixstyle(x)
 
         x = self.mv2[4](x)
         x = self.mvit[0](x)
-        if self.mixstyle:
-            x = self.mixstyle(x)
 
         x = self.mv2[5](x)
         x = self.mvit[1](x)
@@ -354,15 +418,15 @@ def mobileast_xxs(mixstyle):
     dims = [64, 80, 96]
     channels = [16, 16, 24, 24, 48, 48, 64, 64, 80, 80, 320]
     # 频谱参数改变导致输入维度改变的时候，这里(128, 64)也要随之改变
-    return MobileAST((128, 64), dims, channels, num_classes=10, expansion=2, kernel_size=(3, 3), patch_size=(2, 2), mixstyle=mixstyle)
+    return MobileAST((128, 64), dims, channels, num_classes=10, expansion=2, kernel_size=(3, 3), patch_size=(2, 2),
+                     mixstyle=mixstyle)
 
 
 def mobileast_s(mixstyle):
     dims = [144, 192, 240]
     channels = [16, 32, 64, 64, 96, 96, 128, 128, 160, 160, 640]
-    return MobileAST((128, 64), dims, channels, num_classes=10, kernel_size=(3, 3), patch_size=(2, 2), mixstyle=mixstyle)
-
-
+    return MobileAST((128, 64), dims, channels, num_classes=10, kernel_size=(3, 3), patch_size=(2, 2),
+                     mixstyle=mixstyle)
 
 
 if __name__ == '__main__':
@@ -377,4 +441,5 @@ if __name__ == '__main__':
 
     # 评估模型参数量和MACC
     from size_cal import nessi
-    nessi.get_model_size(model, 'torch', input_size=(64, 1, 128, 64))
+
+    nessi.get_model_size(model, 'torch', input_size=(1, 1, 128, 64))
