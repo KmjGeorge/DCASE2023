@@ -48,12 +48,12 @@ def passt(n_classes=10, mixstyle=False):
 
     passt.load_state_dict(passt_dict)
 
-    model.net = passt
-    model.train()
     if mixstyle:
-        return nn.Sequential(MixStyle(p=0.5, alpha=0.1, freq=True), model)
+        model.net = nn.Sequential(MixStyle(p=0.5, alpha=0.1, freq=True), passt)
     else:
-        return model
+        model.net = passt
+    model.train()
+    return model
 
 
 if __name__ == '__main__':
