@@ -28,9 +28,9 @@ def train(model, train_loader, test_loader, start_epoch, epochs, save_name, mixu
 
     criterion = nn.CrossEntropyLoss()
     # 先逐步增加至初始学习率，然后使用余弦退火
-    optimizer = optim.AdamW(model.parameters(), lr=1e-3, weight_decay=0.01)
-    scheduler_cos = CosineAnnealingLR(optimizer, T_max=MAX_EPOCH, eta_min=1e-6)
-    scheduler_warmup = GradualWarmupScheduler(optimizer, multiplier=1, total_epoch=int(MAX_EPOCH/10) + 1,
+    optimizer = optim.AdamW(model.parameters(), lr=1e-5, weight_decay=0.001)
+    scheduler_cos = CosineAnnealingLR(optimizer, T_max=MAX_EPOCH, eta_min=1e-7)
+    scheduler_warmup = GradualWarmupScheduler(optimizer, multiplier=1, total_epoch=int(MAX_EPOCH/10),
                                               after_scheduler=scheduler_cos)
     scheduler_warmup.step()  # 学习率从0开始，跳过第一轮
 

@@ -1,4 +1,5 @@
 from hear21passt.base import get_basic_model, get_model_passt, load_model
+from hear21passt.models.preprocess import AugmentMelSTFT
 import torch
 import torch.nn.functional as F
 import torch.nn as nn
@@ -13,6 +14,10 @@ def passt(n_classes=10, mixstyle=False):
                               htk=False, fmin=0.0, fmax=None, norm=1, fmin_aug_range=10,
                               fmax_aug_range=2000)
     '''
+    model.mel = AugmentMelSTFT(n_mels=128, sr=32000, win_length=800, hopsize=320, n_fft=1024, freqm=48,
+                               timem=20,
+                               htk=False, fmin=0.0, fmax=None, norm=1, fmin_aug_range=1,
+                               fmax_aug_range=1)
 
     passt = get_model_passt(arch="passt_s_swa_p16_128_ap476", n_classes=n_classes)
     # 加载预训练权重，网络结构有变化的剔除
@@ -49,7 +54,7 @@ def passt(n_classes=10, mixstyle=False):
     passt.load_state_dict(passt_dict)
 
     if mixstyle:
-        model.net = nn.Sequential(MixStyle(p=0.5, alpha=0.1, freq=True), passt)
+        model.net = nn.Sequential(MixStyle(p=0.6, alpha=0.3, freq=True), passt)
     else:
         model.net = passt
     model.train()
