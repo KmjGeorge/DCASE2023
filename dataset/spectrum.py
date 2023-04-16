@@ -121,7 +121,7 @@ class ExtractMel(nn.Module):
 
 
 if __name__ == '__main__':
-    from dataconfig import spectrum_config
+    from configs.dataconfig import spectrum_config
     # 测试
     extmel = ExtractMel(**spectrum_config)
     batch = []

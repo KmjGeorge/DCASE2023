@@ -5,36 +5,35 @@ from optim.scheduler import GradualWarmupScheduler
 import torch.nn as nn
 from tqdm import tqdm
 from dataset.augmentation import mixup
-from train.trainingconfig import training_config
 import pandas as pd
 
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
 
-
-MAX_EPOCH = training_config['epoch']
-TASK_NAME = training_config['task_name']
-MIXUP_ALPHA = training_config['mixup_alpha']
-CHOOSE_MODEL = training_config['model']
-
-
-# 定义普通的训练过程，mixup_alpha为mixup参数，0不启用
-
-def train(model, train_loader, test_loader, start_epoch, epochs, save_name, mixup_alpha, save=True):
+# 定义普通的训练过程
+def train(model, train_loader, test_loader, start_epoch, normal_training_conf, mixup_conf,
+          save=True):
     loss_list = []
     acc_list = []
     val_loss_list = []
     val_acc_list = []
 
-    criterion = nn.CrossEntropyLoss()
+    TASK_NAME = normal_training_conf['task_name']
+    MAX_EPOCH = normal_training_conf['epoch']
+    OPTIM_CONF = normal_training_conf['optim_config']
+    SCHEDULER_COS_CONFIG = normal_training_conf['scheduler_cos_config']
+    SCHEDULER_WARMUP_CONFIG = normal_training_conf['scheduler_warmup_config']
+    criterion = normal_training_conf['criterion']
+
     # 先逐步增加至初始学习率，然后使用余弦退火
-    optimizer = optim.AdamW(model.parameters(), lr=1e-5, weight_decay=0.001)
-    scheduler_cos = CosineAnnealingLR(optimizer, T_max=MAX_EPOCH, eta_min=1e-7)
-    scheduler_warmup = GradualWarmupScheduler(optimizer, multiplier=1, total_epoch=10,
+    optimizer = OPTIM_CONF['name'](model.parameters(), lr=OPTIM_CONF['lr'], weight_decay=OPTIM_CONF['weight_decay'])
+    scheduler_cos = CosineAnnealingLR(optimizer, T_max=MAX_EPOCH, eta_min=SCHEDULER_COS_CONFIG['eta_min'])
+    scheduler_warmup = GradualWarmupScheduler(optimizer, multiplier=SCHEDULER_WARMUP_CONFIG['multiplier'],
+                                              total_epoch=SCHEDULER_WARMUP_CONFIG['total_epoch'],
                                               after_scheduler=scheduler_cos)
     scheduler_warmup.step()  # 学习率从0开始，跳过第一轮
 
-    for i in range(epochs):
+    for i in range(MAX_EPOCH):
         epoch_loss, epoch_acc = train_per_epoch(
             model=model,
             train_loader=train_loader,
@@ -43,9 +42,9 @@ def train(model, train_loader, test_loader, start_epoch, epochs, save_name, mixu
             scheduler=scheduler_warmup,
             start_epoch=start_epoch,
             epoch=i,
-            epochs=epochs,
-            save_name=save_name,
-            mixup_alpha=mixup_alpha,
+            epochs=MAX_EPOCH,
+            save_name=TASK_NAME,
+            mixup_conf=mixup_conf,
             save=save)
         # 每轮验证一次
         val_epoch_loss, val_epoch_acc = validate(
@@ -57,21 +56,19 @@ def train(model, train_loader, test_loader, start_epoch, epochs, save_name, mixu
         acc_list.append(epoch_acc)
         val_loss_list.append(val_epoch_loss)
         val_acc_list.append(val_epoch_acc)
-        if save:
-            logs = pd.DataFrame({'loss': epoch_loss,
-                                 'acc': epoch_acc,
-                                 'val_loss': val_epoch_loss,
-                                 'val_acc': val_epoch_acc}
+        if save:                                              # 保存训练日志
+            logs = pd.DataFrame({'loss': loss_list,
+                                 'acc': acc_list,
+                                 'val_loss': val_loss_list,
+                                 'val_acc': val_acc_list}
                                 )
-            logs.to_csv('../logs/{}_logs.csv'.format(TASK_NAME), index=True, mode='a')
+            logs.to_csv('../logs/{}_logs.csv'.format(TASK_NAME), index=True)
     print('==========Finished Training===========')
-
-    if save:
-        torch.save(model, '../model_weights/{}_final.pt'.format(save_name))
     return loss_list, acc_list, val_loss_list, val_acc_list
 
 
-def train_per_epoch(model, train_loader, criterion, optimizer, scheduler, start_epoch, epoch, epochs, save_name, mixup_alpha=0,
+def train_per_epoch(model, train_loader, criterion, optimizer, scheduler, start_epoch, epoch, epochs, save_name,
+                    mixup_conf,
                     save=True):
     correct = 0
     total = 0
@@ -82,12 +79,12 @@ def train_per_epoch(model, train_loader, criterion, optimizer, scheduler, start_
     for x, y in loop:
         x = x.to(device)
         y = y.to(device)
-        if mixup_alpha == 0:  # alpha=0 不使用mixup
+        if not mixup_conf['enable']:  # 不使用mixup
             optimizer.zero_grad()
             y_pred = model(x)
             loss = criterion(y_pred, y)
         else:
-            x_mix, y_a, y_b, lamb = mixup(x, y, mixup_alpha)
+            x_mix, y_a, y_b, lamb = mixup(x, y, mixup_conf['alpha'])
             x_mix = x_mix.to(device)
             y_a = y_a.to(device)
             y_b = y_b.to(device)
@@ -105,7 +102,7 @@ def train_per_epoch(model, train_loader, criterion, optimizer, scheduler, start_
 
         # 计算训练loss和acc（每批）
         with torch.no_grad():
-            if mixup_alpha == 0:
+            if mixup_conf['alpha'] == 0:
                 y_ = torch.argmax(y_pred, dim=1)
             else:
                 y_ = torch.argmax(model(x), dim=1)  # 使用非mixup的数据计算acc
@@ -122,7 +119,8 @@ def train_per_epoch(model, train_loader, criterion, optimizer, scheduler, start_
     epoch_loss = sum_loss / total
     epoch_acc = correct / total
     if save:
-        torch.save(model.state_dict(), "../model_weights/{}_epoch{}.pt".format(save_name, start_epoch + epoch + 1))  # 每轮保存一次便于调试
+        torch.save(model.state_dict(),
+                   "../model_weights/{}_epoch{}.pt".format(save_name, start_epoch + epoch + 1))  # 每轮保存一次参数
     return epoch_loss, epoch_acc
 
 
@@ -133,7 +131,7 @@ def validate(model, test_loader, criterion):
     model.eval()
 
     with torch.no_grad():
-        loop = tqdm(test_loader, desc='Test')
+        loop = tqdm(test_loader, desc='Validation')
         for x, y in loop:
             x = x.to(device)
             y = y.to(device)

@@ -1,7 +1,6 @@
 import torch
 import torch.nn as nn
 from einops import rearrange
-import numpy as np
 from model_src.module.mixstyle import MixStyle
 from model_src.module.ssn import SubSpecNormalization
 
@@ -408,24 +407,25 @@ def mobilevit_s():
     return MobileViT((256, 256), dims, channels, num_classes=1000)
 
 
-def mobileast_xxs(enable, p=0.6, alpha=0.3, freq=True):
+def mobileast_xxs(mixstyle_conf):
     dims = [64, 80, 96]
     channels = [16, 16, 24, 24, 48, 48, 64, 64, 80, 80, 320]
     # 频谱参数改变导致输入维度改变的时候，这里(128, 64)也要随之改变
-    if enable:
-        return nn.Sequential(MixStyle(p, alpha, freq), MobileAST((128, 64), dims, channels,
-                                                                 num_classes=10,
-                                                                 expansion=2, kernel_size=(3, 3), patch_size=(2, 2)))
+    if mixstyle_conf['enable']:
+        return nn.Sequential(MixStyle(mixstyle_conf['p'], mixstyle_conf['alpha'], mixstyle_conf['freq']),
+                             MobileAST((128, 64), dims, channels,
+                                       num_classes=10,
+                                       expansion=2, kernel_size=(3, 3), patch_size=(2, 2)))
     else:
         return MobileAST((128, 64), dims, channels, num_classes=10, expansion=2, kernel_size=(3, 3), patch_size=(2, 2))
 
 
-def mobileast_s(enable, p=0.6, alpha=0.3, freq=True):
+def mobileast_s(mixstyle_conf):
     dims = [144, 192, 240]
     channels = [16, 32, 64, 64, 96, 96, 128, 128, 160, 160, 640]
     from model_src.module.mixstyle import MixStyle
-    if enable:
-        return nn.Sequential(MixStyle(p, alpha, freq),
+    if mixstyle_conf['enable']:
+        return nn.Sequential(MixStyle(mixstyle_conf['p'], mixstyle_conf['alpha'], mixstyle_conf['freq']),
                              MobileAST((128, 64), dims, channels, num_classes=10, kernel_size=(3, 3),
                                        patch_size=(2, 2)))
 
@@ -435,8 +435,8 @@ def mobileast_s(enable, p=0.6, alpha=0.3, freq=True):
 
 if __name__ == '__main__':
     # img = torch.randn(5, 3, 256, 256).to('cuda')
-
-    model = mobileast_xxs(enable=False).to(device)
+    from configs.trainingconfig import training_config
+    model = mobileast_xxs(mixstyle_conf=training_config['mixstyle']).to(device)
     # out = vit(img)
     # print(out.shape)
     # print(count_parameters(vit))

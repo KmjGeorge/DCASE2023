@@ -22,7 +22,8 @@ def load_pretrained_weights(passt, n_classes):
     passt_dict.update(pretrained_dict)
     # 利用自适应平均池化整合位置编码
     time_new_pos_embed = passt_dict['time_new_pos_embed']  # (1, 768, 1, 99)
-    time_new_pos_embed = torch.unsqueeze(F.adaptive_avg_pool1d(time_new_pos_embed[0], output_size=10), dim=0)  # (1, 768, 1, 10)
+    time_new_pos_embed = torch.unsqueeze(F.adaptive_avg_pool1d(time_new_pos_embed[0], output_size=10),
+                                         dim=0)  # (1, 768, 1, 10)
 
     # 修改最后的分类层权重适应新的分类数量  527类->10类
     head1_weight = passt_dict['head.1.weight']  # (527, 768)
@@ -53,7 +54,7 @@ def load_pretrained_weights(passt, n_classes):
     passt.load_state_dict(passt_dict)
 
 
-def passt(enable, p=0.6, alpha=0.3, freq=True, n_classes=10):
+def passt(mixstyle_conf, n_classes=10):
     model = get_basic_model(mode="logits")  # model包含model.mel和model.net 分别是输入特征提取层和主干网络
     ''' # model.mel默认为
     AugmentMelSTFT(n_mels=128, sr=32000, win_length=800, hopsize=320, n_fft=1024, freqm=48,
@@ -85,9 +86,8 @@ def passt(enable, p=0.6, alpha=0.3, freq=True, n_classes=10):
 
     load_pretrained_weights(passt, n_classes)
 
-
-    if enable:
-        model.net = nn.Sequential(MixStyle(p, alpha, freq), passt)
+    if mixstyle_conf['enable']:
+        model.net = nn.Sequential(MixStyle(mixstyle_conf['p'], mixstyle_conf['alpha'], mixstyle_conf['freq']), passt)
     else:
         model.net = passt
     model.train()

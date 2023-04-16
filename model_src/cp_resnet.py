@@ -284,7 +284,7 @@ class Network(nn.Module):
                 torch.quantization.fuse_modules(m[1], ['0', '1'], inplace=True)
 
 
-def cp_resnet(enable, alpha, p, freq):
+def cp_resnet(mixstyle_conf):
     rho = 4
     in_channels = 1
     arch = "cp_resnet"
@@ -337,7 +337,7 @@ def cp_resnet(enable, alpha, p, freq):
     }
 
     from model_src.module.mixstyle import MixStyle
-    if enable:
-        return nn.Sequential(MixStyle(p, alpha, freq), Network(model_config))
+    if mixstyle_conf['enable']:
+        return nn.Sequential(MixStyle(mixstyle_conf['p'], mixstyle_conf['alpha'], mixstyle_conf['freq']), Network(model_config))
     else:
         return Network(model_config)

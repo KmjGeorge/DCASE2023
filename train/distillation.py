@@ -5,15 +5,17 @@ import torch.optim as optim
 from torch.optim.lr_scheduler import CosineAnnealingLR
 from optim.scheduler import GradualWarmupScheduler
 from tqdm import tqdm
-from train.trainingconfig import training_config
+from configs.trainingconfig import training_config
+from configs.mixup import mixup_config
 from train.normal_train import validate
 
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
 MAX_EPOCH = training_config['epoch']
 TASK_NAME = training_config['task_name']
-MIXUP_ALPHA = training_config['mixup_alpha']
-CHOOSE_MODEL = training_config['model']
+
+OPTIM_CONF = training_config['optim_config']
+MIXUP_CONF = mixup_config
 
 
 def train_student(student, teacher, train_loader, test_loader, epochs, save_name, save=True):
@@ -24,10 +26,11 @@ def train_student(student, teacher, train_loader, test_loader, epochs, save_name
 
     criterion = nn.CrossEntropyLoss()
     # 先逐步增加至初始学习率，然后使用余弦退火
-    optimizer = optim.AdamW(student.parameters(), lr=1e-4, weight_decay=0.01)
+    optimizer = OPTIM_CONF['name'](student.parameters(), lr=OPTIM_CONF['lr'], weight_decay=OPTIM_CONF['weight_decay'])
     scheduler_cos = CosineAnnealingLR(optimizer, T_max=MAX_EPOCH, eta_min=1e-5)
     scheduler_warmup = GradualWarmupScheduler(optimizer, multiplier=1, total_epoch=int(MAX_EPOCH / 10) + 1,
                                               after_scheduler=scheduler_cos)
+    scheduler_warmup.step()
     for i in range(epochs):
         epoch_loss, epoch_acc = distillation(
             model=student,
