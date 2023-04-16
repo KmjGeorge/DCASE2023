@@ -286,10 +286,10 @@ def get_tau2022_reassembled():
 # 获取经过reassemble并随机切取1s的tau2022数据集
 def get_tau2022_reassembled_random_slicing():
     train_h5 = os.path.join(H5PATH, 'tau2022_reassembled_train.h5')
-    test_h5 = os.path.join(H5PATH, 'tau2022_reassembled_test.h5')
+    test_h5 = os.path.join(H5PATH, 'tau2022_test.h5')
     TAU2022_random_slicing_train = TAU2022_Random_Slicing(train_h5)
     # print('len(slicing_train)=', len(TAU2022_random_slicing_train))  # 13962
-    TAU2022_random_slicing_test = TAU2022_Random_Slicing(test_h5)
+    TAU2022_random_slicing_test = TAU2022(test_h5)  # 测试集为原版
     # print('len(slicing_test)=', len(TAU2022_test))  # 2968
     train = DataLoader(TAU2022_random_slicing_train, batch_size=BATCH_SIZE, shuffle=SHUFFLE)
     test = DataLoader(TAU2022_random_slicing_test, batch_size=BATCH_SIZE, shuffle=False)
@@ -321,7 +321,8 @@ if __name__ == '__main__':
         i += 1
     '''
 
-    '''TAU2022_reassembled数据集调用
+    '''
+    # TAU2022_reassembled数据集调用
     TAU2022_reassembled_train, TAU2022_reassembled_test = get_tau2022_reassembled()
     i = 0
     # 输出一批数据的shape
