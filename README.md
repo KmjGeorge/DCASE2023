@@ -2,6 +2,8 @@
 
 施工中……
 
+# 此Readme为旧版，等待更新
+
 requirements.txt为项目主要使用的包，可能有遗漏，导入到工程缺哪个再装哪个
 
 此外需安装hear21passt，原项目地址https://github.com/kkoutini/passt_hear21
