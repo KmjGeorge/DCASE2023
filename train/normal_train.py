@@ -30,7 +30,7 @@ def train(model, train_loader, test_loader, start_epoch, epochs, save_name, mixu
     # 先逐步增加至初始学习率，然后使用余弦退火
     optimizer = optim.AdamW(model.parameters(), lr=1e-5, weight_decay=0.001)
     scheduler_cos = CosineAnnealingLR(optimizer, T_max=MAX_EPOCH, eta_min=1e-7)
-    scheduler_warmup = GradualWarmupScheduler(optimizer, multiplier=1, total_epoch=int(MAX_EPOCH/10),
+    scheduler_warmup = GradualWarmupScheduler(optimizer, multiplier=1, total_epoch=10,
                                               after_scheduler=scheduler_cos)
     scheduler_warmup.step()  # 学习率从0开始，跳过第一轮
 
@@ -48,20 +48,20 @@ def train(model, train_loader, test_loader, start_epoch, epochs, save_name, mixu
             mixup_alpha=mixup_alpha,
             save=save)
         # 每轮验证一次
-        test_epoch_loss, test_epoch_acc = validate(
+        val_epoch_loss, val_epoch_acc = validate(
             model=model,
             test_loader=test_loader,
             criterion=criterion)
 
         loss_list.append(epoch_loss)
         acc_list.append(epoch_acc)
-        val_loss_list.append(test_epoch_loss)
-        val_acc_list.append(test_epoch_acc)
+        val_loss_list.append(val_epoch_loss)
+        val_acc_list.append(val_epoch_acc)
         if save:
             logs = pd.DataFrame({'loss': epoch_loss,
-                                 'acc': acc_list,
-                                 'val_loss': val_loss_list,
-                                 'val_acc': val_acc_list}
+                                 'acc': epoch_acc,
+                                 'val_loss': val_epoch_loss,
+                                 'val_acc': val_epoch_acc}
                                 )
             logs.to_csv('../logs/{}_logs.csv'.format(TASK_NAME), index=True, mode='a')
     print('==========Finished Training===========')

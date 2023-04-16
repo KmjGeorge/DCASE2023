@@ -66,21 +66,22 @@ if __name__ == '__main__':
     MAX_EPOCH = training_config['epoch']
     TASK_NAME = training_config['task_name']
     MIXUP_ALPHA = training_config['mixup_alpha']
+    MIXSTYLE = training_config['mixstyle']
     CHOOSE_MODEL = training_config['model']
     DATASET_NAME = dataset_config['name']
 
     '''2. 获取模型'''
     # 频谱特征提取和增强在dataset.spectrum.ExtractMel，作为网络的一个输入层使用
     if CHOOSE_MODEL == 'cp_resnet':
-        model = nn.Sequential(ExtractMel(**spectrum_config), cp_resnet(mixstyle=True)).to(device)
+        model = nn.Sequential(ExtractMel(**spectrum_config), cp_resnet(**MIXSTYLE)).to(device)
     elif CHOOSE_MODEL == 'mobileast_s':
-        model = nn.Sequential(ExtractMel(**spectrum_config), mobileast_s(mixstyle=True)).to(device)
+        model = nn.Sequential(ExtractMel(**spectrum_config), mobileast_s(**MIXSTYLE)).to(device)
     elif CHOOSE_MODEL == 'mobileast_xxs':
-        model = nn.Sequential(ExtractMel(**spectrum_config), mobileast_xxs(mixstyle=True)).to(device)
+        model = nn.Sequential(ExtractMel(**spectrum_config), mobileast_xxs(**MIXSTYLE)).to(device)
     elif CHOOSE_MODEL == 'rfr-cnn':
         model = nn.Sequential(ExtractMel(**spectrum_config), RFR_CNN().to(device))
     elif CHOOSE_MODEL == 'passt':
-        model = passt(mixstyle=True).to(device)
+        model = passt(**MIXSTYLE, n_classes=10).to(device)
     elif CHOOSE_MODEL == 'acdnet':
         model = GetACDNetModel(input_len=32000, nclass=10, sr=spectrum_config['sr'])
     else:
@@ -97,6 +98,8 @@ if __name__ == '__main__':
         train_dataloader, test_dataloader = dataset.datagenerator.get_tau2022()
     elif DATASET_NAME == 'urbansound8k' or DATASET_NAME == 'URBANSOUND8K':
         train_dataloader, test_dataloader = dataset.datagenerator.get_urbansound8k(fold_shuffle=True)
+    elif DATASET_NAME == 'TAU2022_REASSEMBLED' or DATASET_NAME == 'tau2022_reassembled':
+        train_dataloader, test_dataloader = dataset.datagenerator.get_tau2022_reassembled()
     else:
         raise '未定义的数据集！'
 

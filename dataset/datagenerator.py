@@ -75,8 +75,8 @@ class UrbanSound8K(Dataset):
 class TAU2022(Dataset):
     def __init__(self, h5_path):
         assert (
-                DATASET_NAME == 'TAU2022' or DATASET_NAME == 'tau2022' or DATASET_NAME == 'TAU2022_RANDOM_SLICING' or DATASET_NAME == 'tau2022_random_slicing')
-
+                DATASET_NAME == 'TAU2022' or DATASET_NAME == 'tau2022' or DATASET_NAME == 'TAU2022_RANDOM_SLICING' or DATASET_NAME == 'tau2022_random_slicing'
+                or DATASET_NAME == 'TAU2022_REASSEMBLED' or DATASET_NAME == 'tau2022_reassembled')
         self.X = []
         Y = []
         with h5py.File(h5_path, 'r') as f:
@@ -132,6 +132,39 @@ def make_tau2022(meta_path, h5_path):
             except:
                 label_group.create_dataset('x', data=[data], maxshape=(None, SR), chunks=True)
         loop2.set_description('制作tau2022 h5数据集...')
+    print('数据保存至 {}'.format(h5_path))
+
+
+def make_tau2022_reassembled(meta_path, h5_path):
+    assert not os.path.exists(h5_path), "文件{}已存在！".format(h5_path)
+    df = pd.read_csv(meta_path)
+    X = []
+    Y = []
+    loop = tqdm(df['filename'])
+    for filename in loop:
+        scene_label = df[df['filename'] == filename]['scene_label'].values[0]
+        full_path = os.path.join(AUDIO_PATH, filename)
+        audio, _ = librosa.load(full_path, sr=SR)
+        X.append(audio)
+        Y.append(scene_label)
+        loop.set_description('从audio文件读取tau2022_reassembled数据集...')
+
+    loop2 = tqdm(range(len(X)))
+    for i in loop2:
+        data = np.array(X[i])
+        label = Y[i]
+        with h5py.File(h5_path, 'a') as f:
+            try:
+                label_group = f[label]
+            except:
+                label_group = f.create_group(label)
+            try:
+                dataset = label_group['x']
+                dataset.resize((dataset.shape[0] + 1, dataset.shape[1]))
+                dataset[-1] = data
+            except:
+                label_group.create_dataset('x', data=[data], maxshape=(None, SR * 10), chunks=True)
+        loop2.set_description('制作tau2022_reassembled h5数据集...')
     print('数据保存至 {}'.format(h5_path))
 
 
@@ -231,6 +264,18 @@ def get_tau2022():
     return train, test
 
 
+def get_tau2022_reassembled():
+    train_h5 = os.path.join(H5PATH, 'tau2022_reassembled_train.h5')
+    test_h5 = os.path.join(H5PATH, 'tau2022_reassembled_test.h5')
+    TAU2022_train = TAU2022(train_h5)
+    # print('len(TAU2022_train)=', len(TAU2022_train))  # 13962
+    TAU2022_test = TAU2022(test_h5)
+    # print('len(TAU2022_test)=', len(TAU2022_test))  # 2968
+    train = DataLoader(TAU2022_train, batch_size=BATCH_SIZE, shuffle=SHUFFLE)
+    test = DataLoader(TAU2022_test, batch_size=BATCH_SIZE, shuffle=False)
+    return train, test
+
+
 # 获取经过reassemble并随机切取1s的tau2022数据集
 def get_tau2022_random_slicing():
     train_h5 = SLICING_H5PATH
@@ -246,22 +291,36 @@ def get_tau2022_random_slicing():
 
 if __name__ == '__main__':
     # 以H5制作TAU2022原版数据集，存放到dataconfig['h5_ath']
-    train_h5 = os.path.join(H5PATH, 'tau2022_train.h5')
-    test_h5 = os.path.join(H5PATH, 'tau2022_test.h5')
+    train_h5 = os.path.join(H5PATH, 'tau2022_reassembled_train.h5')
+    test_h5 = os.path.join(H5PATH, 'tau2022_reassembled_test.h5')
     train_csv = os.path.split(META_PATH)[0] + '/evaluation_setup/fold1_train.csv'
     test_csv = os.path.split(META_PATH)[0] + '/evaluation_setup/fold1_evaluate.csv'
-    make_tau2022(train_csv, train_h5)
-    make_tau2022(test_csv, test_h5)
+    make_tau2022_reassembled(train_csv, train_h5)
+    make_tau2022_reassembled(test_csv, test_h5)
 
     # 以H5制作根据reassemble的数据集生成10s随机采样为若干1s的数据集，存放到dataconfig['slicing_h5_path']
     # 在此之前，请先运行dataset/files_reassemble.ipynb和dataset/meta_csv_reassemble.ipynb 以制作reassemble数据集，
-    make_tau2022_reassemble_random_slicing(n=10)  # 参数n为随机采样的次数，最后得到的数据集为原数据集的n倍
+    # make_tau2022_reassemble_random_slicing(n=10)  # 参数n为随机采样的次数，最后得到的数据集为原数据集的n倍
 
     '''原版TAU2022数据集调用
     TAU2022_train, TAU2022_test = get_tau2022()
     i = 0
     # 输出一批数据的shape
     for x, y in TAU2022_train:
+        if i == 1:
+            break
+        print(x.shape)
+        print(y.shape)
+        # print(x)
+        # print(y)
+        i += 1
+    '''
+
+    '''TAU2022_reassembled数据集调用
+    TAU2022_reassembled_train, TAU2022_reassembled_test = get_tau2022_reassembled()
+    i = 0
+    # 输出一批数据的shape
+    for x, y in TAU2022_reassembled_train:
         if i == 1:
             break
         print(x.shape)

@@ -12,7 +12,7 @@ spectrum_config = {
     'fmax_aug_range': 1000  # mel滤波器频率随机偏移范围 最大值
 }
 
-
+'''
 dataset_config = {
     'name': 'tau2022_random_slicing',  # 目前可用的数据集 urbansound8k, tau2022, tau2022_random_slicing
     'batch_size': 64,
@@ -26,8 +26,10 @@ dataset_config = {
     'reassembled_meta_path': 'D:/datasets/TAU-urban-acoustic-scenes-2022-mobile-development-reassembled/meta.csv',
     'slicing_h5path': 'D:/github/DCASE2023/dataset/h5/tau2022_reassembled_random_slicing.h5',
 }
+'''
 
-"""
+
+
 dataset_config = {
     'name': 'tau2022',
     'batch_size': 64,
@@ -40,7 +42,22 @@ dataset_config = {
     'reassembled_meta_path': None,
     'slicing_h5path': None,
 }
-"""
+
+
+'''
+dataset_config = {
+    'name': 'tau2022_reassembled',
+    'batch_size': 4,
+    'meta_path': 'D:/datasets/TAU-urban-acoustic-scenes-2022-mobile-development-reassembled/meta.csv',
+    'audio_path': 'D:/datasets/TAU-urban-acoustic-scenes-2022-mobile-development-reassembled/',
+    'h5path': 'D:/github/DCASE2023/dataset/h5/',
+    'num_classes': 10,
+    'shuffle': True,
+    'reassembled_audio_path': None,
+    'reassembled_meta_path': None,
+    'slicing_h5path': None,
+}
+'''
 
 """
 dataset_config = {
