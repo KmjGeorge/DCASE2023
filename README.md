@@ -2,9 +2,7 @@
 
 施工中……
 
-requirements.txt是自动导出的完整环境，存在冗余和未使用的包
-
-建议使用 requirements_simple.txt为项目主要使用的包，可能有遗漏，导入到工程缺哪个再装哪个
+requirements.txt为项目主要使用的包，可能有遗漏，导入到工程缺哪个再装哪个
 
 此外需安装hear21passt，原项目地址https://github.com/kkoutini/passt_hear21
 

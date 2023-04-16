@@ -5,7 +5,8 @@ numpy
 pandas
 librosa
 soundfile
-torch
+pytorch_quantization
+torch<2.0
 torchaudio
 torchinfo
 torchsummary
