@@ -1,6 +1,6 @@
 h5py
 matplotlib
-einop
+einops
 numpy
 pandas
 librosa
