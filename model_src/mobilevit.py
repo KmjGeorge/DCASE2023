@@ -3,11 +3,12 @@ import torch.nn as nn
 from einops import rearrange
 from model_src.module.mixstyle import MixStyle
 from model_src.module.ssn import SubSpecNormalization
+from model_src.module.rfn import RFN
 
 device = 'cuda' if torch.cuda.is_available() else 'cpu'
 
 # 子谱数
-SubSpecNum = 2
+SubSpecNum = 4
 
 
 def conv_1x1_bn(inp, oup):
@@ -46,6 +47,16 @@ class PreNorm(nn.Module):
     def __init__(self, dim, fn):
         super().__init__()
         self.norm = nn.LayerNorm(dim)
+        self.fn = fn
+
+    def forward(self, x, **kwargs):
+        return self.fn(self.norm(x), **kwargs)
+
+
+class PreNorm_RFN(nn.Module):
+    def __init__(self, dim, fn):
+        super().__init__()
+        self.norm = RFN(lamb=0.5, eps=1e-5)
         self.fn = fn
 
     def forward(self, x, **kwargs):
@@ -103,6 +114,23 @@ class Transformer(nn.Module):
             self.layers.append(nn.ModuleList([
                 PreNorm(dim, Attention(dim, heads, dim_head, dropout)),
                 PreNorm(dim, FeedForward(dim, mlp_dim, dropout))
+            ]))
+
+    def forward(self, x):
+        for attn, ff in self.layers:
+            x = attn(x) + x
+            x = ff(x) + x
+        return x
+
+
+class Transformer_Alter(nn.Module):
+    def __init__(self, dim, depth, heads, dim_head, mlp_dim, dropout=0.):
+        super().__init__()
+        self.layers = nn.ModuleList([])
+        for _ in range(depth):
+            self.layers.append(nn.ModuleList([
+                PreNorm_RFN(dim, Attention(dim, heads, dim_head, dropout)),
+                PreNorm_RFN(dim, FeedForward(dim, mlp_dim, dropout))
             ]))
 
     def forward(self, x):
@@ -247,7 +275,8 @@ class MobileASTBlock(nn.Module):
         self.conv1 = conv_nxn_ssn(channel, channel, S=SubSpecNum, kernal_size=kernel_size)
         self.conv2 = conv_1x1_ssn(channel, dim, S=SubSpecNum)
 
-        self.transformer = Transformer(dim, depth, 4, 8, mlp_dim, dropout)
+        self.transformer = Transformer_Alter(dim=dim, depth=depth, heads=4, dim_head=8, mlp_dim=mlp_dim,
+                                             dropout=dropout)
 
         self.conv3 = conv_1x1_ssn(dim, channel, S=SubSpecNum)
         self.conv4 = conv_nxn_ssn(2 * channel, channel, S=SubSpecNum, kernal_size=kernel_size)
@@ -331,7 +360,7 @@ class MobileViT(nn.Module):
         return x
 
 
-# 将BN换为SSN，并使用FreqMixStyle
+# 将BN换为SSN
 class MobileAST(nn.Module):
     def __init__(self, spec_size, dims, channels, num_classes, expansion=4, kernel_size=(3, 3), patch_size=(2, 2),
                  ):
@@ -342,6 +371,8 @@ class MobileAST(nn.Module):
 
         L = [2, 4, 3]
 
+        # dims = [64, 80, 96]
+        # channels = [16, 16, 24, 24, 48, 48, 64, 64, 80, 80, 320]
         self.conv1 = conv_nxn_ssn(1, channels[0], stride=2, S=SubSpecNum)
 
         self.mv2 = nn.ModuleList([])
@@ -389,6 +420,56 @@ class MobileAST(nn.Module):
         return x
 
 
+class MobileAST_Light(nn.Module):
+    def __init__(self, spec_size, num_classes, expansion=2, kernel_size=(3, 3), patch_size=(2, 2),
+                 ):
+        super().__init__()
+
+        ih, iw = spec_size[0], spec_size[1]
+        ph, pw = patch_size[0], patch_size[1]
+        assert ih % ph == 0 and iw % pw == 0
+
+        self.conv1 = conv_nxn_ssn(1, 16, stride=2, S=SubSpecNum)
+
+        self.mv2_1 = MV2Block_SSN(16, 24, 1, expansion)
+        self.mv2_2 = MV2Block_SSN(24, 32, 2, expansion)
+
+        self.mvit_1 = MobileASTBlock(48, 4, 32, kernel_size, patch_size, 96)
+
+        self.mv2_3 = MV2Block_SSN(32, 64, 2, expansion)
+
+        self.conv2 = conv_1x1_bn(64, 160)
+
+        self.pool = nn.AvgPool2d((ih // 8, iw // 8), 1)
+        self.fc = nn.Linear(160, num_classes, bias=False)
+
+    def forward(self, x):  # input (1, 1, 128, 64)
+        x = self.conv1(x)  # (1, 16, 64, 32)
+        print(x.shape)
+        x = self.mv2_1(x)  # (1, 24, 64, 32)
+        print(x.shape)
+
+        x = self.mv2_2(x)  # (1, 32, 32, 16)
+        print(x.shape)
+
+        x = self.mvit_1(x)  # （1, 48, 32, 16)
+        print(x.shape)
+
+        x = self.mv2_3(x)  # (1, 64, 16, 8)
+        print(x.shape)
+
+        x = self.conv2(x)  # (1, 160, 16, 8)
+        print(x.shape)
+        x = self.pool(x)  # (1, 160, 1, 1)
+        print(x.shape)
+        x = x.view(-1, x.shape[1])  # (1, 160)
+        print(x.shape)
+
+        x = self.fc(x)  # (1, 10)
+        print(x.shape)
+        return x
+
+
 def mobilevit_xxs():
     dims = [64, 80, 96]
     channels = [16, 16, 24, 24, 48, 48, 64, 64, 80, 80, 320]
@@ -417,7 +498,17 @@ def mobileast_xxs(mixstyle_conf):
                                        num_classes=10,
                                        expansion=2, kernel_size=(3, 3), patch_size=(2, 2)))
     else:
-        return MobileAST((128, 64), dims, channels, num_classes=10, expansion=2, kernel_size=(3, 3), patch_size=(2, 2))
+        return MobileAST((128, 64), dims, channels, num_classes=10, expansion=2, kernel_size=(3, 3),
+                         patch_size=(2, 2))  # h=w<=n
+
+
+def mobileast_light(mixstyle_conf):
+    if mixstyle_conf['enable']:
+        return nn.Sequential(MixStyle(mixstyle_conf['p'], mixstyle_conf['alpha'], mixstyle_conf['freq']),
+                             MobileAST_Light((128, 64), num_classes=10, kernel_size=(3, 3), patch_size=(2, 2)).to(
+                                 device))
+    else:
+        return MobileAST_Light((128, 64), num_classes=10, kernel_size=(3, 3), patch_size=(2, 2)).to(device)
 
 
 def mobileast_s(mixstyle_conf):
@@ -435,8 +526,10 @@ def mobileast_s(mixstyle_conf):
 
 if __name__ == '__main__':
     # img = torch.randn(5, 3, 256, 256).to('cuda')
-    from configs.trainingconfig import training_config
-    model = mobileast_xxs(mixstyle_conf=training_config['mixstyle']).to(device)
+
+    from configs.mixstyle import mixstyle_config
+    model = mobileast_light(mixstyle_conf=mixstyle_config)
+    # model = mobileast_xxs(mixstyle_conf=mixstyle_config)
     # out = vit(img)
     # print(out.shape)
     # print(count_parameters(vit))
@@ -447,3 +540,4 @@ if __name__ == '__main__':
     from size_cal import nessi
 
     nessi.get_model_size(model, 'torch', input_size=(1, 1, 128, 64))
+    print(model)

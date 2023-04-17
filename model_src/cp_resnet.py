@@ -341,3 +341,11 @@ def cp_resnet(mixstyle_conf):
         return nn.Sequential(MixStyle(mixstyle_conf['p'], mixstyle_conf['alpha'], mixstyle_conf['freq']), Network(model_config))
     else:
         return Network(model_config)
+
+
+if __name__ == '__main__':
+    from configs.mixstyle import mixstyle_config
+    model = cp_resnet(mixstyle_config)
+    from size_cal import nessi
+    nessi.get_model_size(model, 'torch', input_size=(1, 1, 256, 44))
+    print(model)
