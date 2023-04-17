@@ -15,8 +15,8 @@ spectrum_config = {
 dataset_config = {
     'name': 'tau2022_random_slicing',
     'batch_size': 64,
-    'meta_path': 'G:/datasets/TAU-urban-acoustic-scenes-2022-mobile-development-reassembled/meta.csv',
-    'audio_path': 'G:/datasets/TAU-urban-acoustic-scenes-2022-mobile-development-reassembled/',
+    'meta_path': 'D:/datasets/TAU-urban-acoustic-scenes-2022-mobile-development-reassembled/meta.csv',
+    'audio_path': 'D:/datasets/TAU-urban-acoustic-scenes-2022-mobile-development-reassembled/',
     'h5path': 'D:/github/DCASE2023/dataset/h5/',
     'num_classes': 10,
     'shuffle': True,
@@ -26,8 +26,8 @@ dataset_config = {
 dataset_config = {
     'name': 'tau2022',
     'batch_size': 64,
-    'meta_path': 'G:/datasets/TAU-urban-acoustic-scenes-2022-mobile-development/meta.csv',
-    'audio_path': 'G:/datasets/TAU-urban-acoustic-scenes-2022-mobile-development/',
+    'meta_path': 'D:/datasets/TAU-urban-acoustic-scenes-2022-mobile-development/meta.csv',
+    'audio_path': 'D:/datasets/TAU-urban-acoustic-scenes-2022-mobile-development/',
     'h5path': 'D:/github/DCASE2023/dataset/h5/',
     'num_classes': 10,
     'shuffle': True,
@@ -38,8 +38,8 @@ dataset_config = {
 dataset_config = {
     'name': 'tau2022_reassembled',
     'batch_size': 64,
-    'meta_path': 'G:/datasets/TAU-urban-acoustic-scenes-2022-mobile-development-reassembled/meta.csv',
-    'audio_path': 'G:/datasets/TAU-urban-acoustic-scenes-2022-mobile-development-reassembled/',
+    'meta_path': 'D:/datasets/TAU-urban-acoustic-scenes-2022-mobile-development-reassembled/meta.csv',
+    'audio_path': 'D:/datasets/TAU-urban-acoustic-scenes-2022-mobile-development-reassembled/',
     'h5path': 'D:/github/DCASE2023/dataset/h5/',
     'num_classes': 10,
     'shuffle': True,
