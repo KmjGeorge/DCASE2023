@@ -278,7 +278,7 @@ get_model_passt(arch="passt_s_swa_p16_128_ap476", n_classes=10, in_channels=1, f
 
 ## V. 运行示例
 
-	##### ①修改配置：
+##### ①修改配置
 
 ​		configs/mixup.py 指定是否使用mixup，超参数alpha
 
