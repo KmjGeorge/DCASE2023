@@ -64,8 +64,8 @@ class UrbanSound8K(Dataset):
 
     def __getitem__(self, idx):
         audio, sr = librosa.load(self.X[idx], sr=SR)
-        if audio.shape[0] != 64000:  # 超出4s的裁剪为4s
-            audio = audio[:64000]
+        if audio.shape[0] != SR*4:  # 超出4s的裁剪为4s
+            audio = audio[:SR*4]
 
         label = self.Y[idx]
         return audio, label
@@ -297,15 +297,24 @@ def get_tau2022_reassembled_random_slicing():
 
 
 if __name__ == '__main__':
-    '''
-    # 以H5制作TAU2022_reassembled数据集，存放到dataconfig['h5_path']
-    train_h5 = os.path.join(H5PATH, 'tau2022_reassembled_train.h5')
-    test_h5 = os.path.join(H5PATH, 'tau2022_reassembled_test.h5')
-    train_csv = os.path.split(META_PATH)[0] + '/evaluation_setup/fold1_train.csv'
-    test_csv = os.path.split(META_PATH)[0] + '/evaluation_setup/fold1_evaluate.csv'
-    make_tau2022_reassembled(train_csv, train_h5)
-    make_tau2022_reassembled(test_csv, test_h5)
-    '''
+    if dataset_config['name'] == 'tau2022':
+        train_h5 = os.path.join(H5PATH, 'tau2022_train.h5')
+        test_h5 = os.path.join(H5PATH, 'tau2022_test.h5')
+        train_csv = os.path.split(META_PATH)[0] + '/evaluation_setup/fold1_train.csv'
+        test_csv = os.path.split(META_PATH)[0] + '/evaluation_setup/fold1_evaluate.csv'
+        make_tau2022(train_csv, train_h5)
+        make_tau2022(test_csv, test_h5)
+    elif dataset_config['name'] == 'tau2022_reassembled':
+        # 以H5制作TAU2022_reassembled数据集，存放到dataconfig['h5_path']
+        train_h5 = os.path.join(H5PATH, 'tau2022_reassembled_train.h5')
+        test_h5 = os.path.join(H5PATH, 'tau2022_reassembled_test.h5')
+        train_csv = os.path.split(META_PATH)[0] + '/evaluation_setup/fold1_train.csv'
+        test_csv = os.path.split(META_PATH)[0] + '/evaluation_setup/fold1_evaluate.csv'
+        make_tau2022_reassembled(train_csv, train_h5)
+        make_tau2022_reassembled(test_csv, test_h5)
+    else:
+        raise '数据集名称错误!'
+
 
     '''原版TAU2022数据集调用
     TAU2022_train, TAU2022_test = get_tau2022()

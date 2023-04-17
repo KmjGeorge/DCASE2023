@@ -9,6 +9,7 @@ import os
 
 
 # 量化
+# TODO
 def quantization(model, mode):
     if mode == 'ptdq':
         quanted_model = torch.quantization.quantize_dynamic(model, {nn.Linear}, dtype=torch.qint8)
@@ -16,7 +17,7 @@ def quantization(model, mode):
         model.eval()
         model.qconfig = torch.ao.quantization.get_default_qconfig('x86')
         model.fused = torch.ao.quantization.fuse_modules(model, [['conv', 'batchnorm']])
-        quanted_model =
+        # quanted_model =
     else:
         quanted_model = None
     return quanted_model
@@ -43,9 +44,11 @@ if __name__ == '__main__':
     from size_cal import nessi
     from torchsummary import summary
     from model_src.cp_resnet import cp_resnet
+    from model_src.mobilevit import mobileast_light
+    from configs.mixstyle import mixstyle_config
 
     # model = mobileast_xxs(mixstyle=True).to('cuda')
-    model = cp_resnet(mixstyle=True)
+    model = mobileast_light(mixstyle_conf=mixstyle_config)
     qmodel = quantization(model, mode='ptdq')
     # summary(model, input_size=(1, 128, 64))
     # summary(qmodel, input_size=(1, 128, 64))

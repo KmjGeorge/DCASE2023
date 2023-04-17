@@ -2,6 +2,7 @@ import torch
 import torch.nn as nn
 import numpy as np
 import random
+from model_src.module.mixstyle import MixStyle
 
 
 class ACDNetV2(nn.Module):
@@ -118,8 +119,12 @@ class ACDNetV2(nn.Module):
         return c
 
 
-def GetACDNetModel(input_len=30225, nclass=50, sr=20000, channel_config=None):
-    net = ACDNetV2(input_len, nclass, sr, ch_conf=channel_config)
+def GetACDNetModel(mixstyle_conf, input_len=30225, nclass=50, sr=20000, channel_config=None):
+    if mixstyle_conf['enable']:
+        net = nn.Sequential(MixStyle(mixstyle_conf['p'], mixstyle_conf['alpha'], mixstyle_conf['freq']),
+                            ACDNetV2(input_len, nclass, sr, ch_conf=channel_config))
+    else:
+        net = ACDNetV2(input_len, nclass, sr, ch_conf=channel_config)
     return net
 
 

@@ -70,11 +70,11 @@ if __name__ == '__main__':
     elif CHOOSE_MODEL == 'mobileast_light':
         model = nn.Sequential(ExtractMel(**spectrum_config), mobileast_light(mixstyle_conf=mixstyle_config)).to(device)
     elif CHOOSE_MODEL == 'rfr-cnn':
-        model = nn.Sequential(ExtractMel(**spectrum_config), RFR_CNN().to(device))
+        model = nn.Sequential(ExtractMel(**spectrum_config), RFR_CNN()).to(device)
     elif CHOOSE_MODEL == 'passt':
         model = passt(mixstyle_conf=mixstyle_config, n_classes=10).to(device)
     elif CHOOSE_MODEL == 'acdnet':
-        model = GetACDNetModel(input_len=32000, nclass=10, sr=spectrum_config['sr'])
+        model = GetACDNetModel(mixstyle_conf=mixstyle_config, input_len=32000, nclass=10, sr=spectrum_config['sr'])
     else:
         raise '未定义的模型！'
 
