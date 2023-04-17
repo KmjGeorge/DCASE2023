@@ -6,7 +6,7 @@ import pandas as pd
 import random
 import numpy as np
 from size_cal import nessi
-from model_src.mobilevit import mobileast_xxs, mobileast_s
+from model_src.mobilevit import mobileast_xxs, mobileast_s, mobileast_light
 from model_src.rfr_cnn import RFR_CNN
 from model_src.cp_resnet import cp_resnet
 from model_src.passt import passt
@@ -67,6 +67,8 @@ if __name__ == '__main__':
         model = nn.Sequential(ExtractMel(**spectrum_config), mobileast_s(mixstyle_conf=mixstyle_config)).to(device)
     elif CHOOSE_MODEL == 'mobileast_xxs':
         model = nn.Sequential(ExtractMel(**spectrum_config), mobileast_xxs(mixstyle_conf=mixstyle_config)).to(device)
+    elif CHOOSE_MODEL == 'mobileast_light':
+        model = nn.Sequential(ExtractMel(**spectrum_config), mobileast_light(mixstyle_conf=mixstyle_config)).to(device)
     elif CHOOSE_MODEL == 'rfr-cnn':
         model = nn.Sequential(ExtractMel(**spectrum_config), RFR_CNN().to(device))
     elif CHOOSE_MODEL == 'passt':
@@ -78,7 +80,6 @@ if __name__ == '__main__':
 
     '''3. 计算模型大小，需指定输入形状 (batch, sr*time) '''
     nessi.get_model_size(model, 'torch', input_size=(1, spectrum_config['sr'] * 1))
-
     '''4. 获取数据集'''
     # 请先在dataset.datagenerator中生成数据集(h5形式)
     if DATASET_NAME == 'TAU2022_RANDOM_SLICING' or DATASET_NAME == 'tau2022_random_slicing':
