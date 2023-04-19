@@ -29,7 +29,7 @@ def get_model(name):
     elif name == 'rfr-cnn':
         model = nn.Sequential(ExtractMel(**spectrum_config), RFR_CNN()).to(device)
     elif name == 'passt':
-        model = passt(mixstyle_conf=mixstyle_config, n_classes=10).to(device)
+        model = passt(mixstyle_conf=mixstyle_config, pretrained=False, n_classes=10).to(device)
     elif name == 'acdnet':
         model = GetACDNetModel(mixstyle_conf=mixstyle_config, input_len=32000, nclass=10, sr=spectrum_config['sr'])
     else:
@@ -76,6 +76,7 @@ if __name__ == '__main__':
     # 固定种子
     setup_seed(200)
 
+    TEACHER_WEIGHT_PATH = distillation_config['teacher_weight_path']
     TEACHER_MODEL = distillation_config['teacher_model']
     STUDENT_MODEL = distillation_config['student_model']
     DATASET_NAME = dataset_config['name']
@@ -84,8 +85,10 @@ if __name__ == '__main__':
     '''2. 获取模型'''
     teacher = get_model(TEACHER_MODEL)
     student = get_model(STUDENT_MODEL)
+    teacher.load_state_dict(torch.load(TEACHER_WEIGHT_PATH))
 
     '''3. 计算模型大小，需指定输入形状 (batch, sr*time) '''
+    nessi.get_model_size(teacher, 'torch', input_size=(1, spectrum_config['sr'] * 1))
     nessi.get_model_size(student, 'torch', input_size=(1, spectrum_config['sr'] * 1))
 
     '''4. 获取数据集'''

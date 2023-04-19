@@ -11,7 +11,7 @@ spectrum_config = {
     'fmin_aug_range': 1,  # mel滤波器频率随机偏移范围 最小值
     'fmax_aug_range': 1  # mel滤波器频率随机偏移范围 最大值
 }
-
+'''
 dataset_config = {
     'name': 'tau2022',
     'batch_size': 64,
@@ -21,8 +21,9 @@ dataset_config = {
     'num_classes': 10,
     'shuffle': True,
 }
-
 '''
+
+
 dataset_config = {
     'name': 'tau2022_random_slicing',
     'batch_size': 64,
@@ -32,7 +33,7 @@ dataset_config = {
     'num_classes': 10,
     'shuffle': True,
 }
-'''
+
 
 '''
 dataset_config = {

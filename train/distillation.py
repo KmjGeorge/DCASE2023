@@ -142,7 +142,7 @@ def distillation_per_epoch(student, teacher, train_loader, hard_criterion, soft_
 
     if save:
         torch.save(student.state_dict(),
-                   "../model_distillation_weights/{}_epoch{}.pt".format(save_name, start_epoch + epoch + 1))  # 每轮保存一次参数
+                   "../model_weights/{}_epoch{}.pt".format(save_name, start_epoch + epoch + 1))  # 每轮保存一次参数
 
     return epoch_loss, epoch_acc
 

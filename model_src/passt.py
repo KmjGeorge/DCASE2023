@@ -54,7 +54,7 @@ def load_pretrained_weights(passt, n_classes):
     passt.load_state_dict(passt_dict)
 
 
-def passt(mixstyle_conf, n_classes=10):
+def passt(mixstyle_conf, pretrained=True, n_classes=10):
     model = get_basic_model(mode="logits")  # model包含model.mel和model.net 分别是输入特征提取层和主干网络
     ''' # model.mel默认为
     AugmentMelSTFT(n_mels=128, sr=32000, win_length=800, hopsize=320, n_fft=1024, freqm=48,
@@ -83,8 +83,8 @@ def passt(mixstyle_conf, n_classes=10):
     passt = get_model_passt(arch="passt_s_swa_p16_128_ap476", n_classes=n_classes, in_channels=1, fstride=10,
                             tstride=10,
                             input_fdim=128, input_tdim=100, u_patchout=0, s_patchout_t=0, s_patchout_f=6)
-
-    load_pretrained_weights(passt, n_classes)
+    if pretrained:
+        load_pretrained_weights(passt, n_classes)
 
     if mixstyle_conf['enable']:
         model.net = nn.Sequential(MixStyle(mixstyle_conf['p'], mixstyle_conf['alpha'], mixstyle_conf['freq']), passt)
