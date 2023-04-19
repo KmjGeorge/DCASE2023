@@ -1,10 +1,44 @@
 from hear21passt.base import get_basic_model, get_model_passt, load_model
+from hear21passt.wrapper import PasstBasicWrapper
 from hear21passt.models.preprocess import AugmentMelSTFT
 import hear21passt.models.passt
 import torch
 import torch.nn.functional as F
 import torch.nn as nn
 from model_src.module.mixstyle import MixStyle
+
+
+def get_model_wrapper(n_classes, **kwargs):
+    mel = AugmentMelSTFT(n_mels=128, sr=32000, win_length=800, hopsize=320, n_fft=1024, freqm=48,
+                         timem=20,
+                         htk=False, fmin=0.0, fmax=None, norm=1, fmin_aug_range=1,
+                         fmax_aug_range=1)
+    '''
+    默认为
+    AugmentMelSTFT(n_mels=128, sr=32000, win_length=800, hopsize=320, n_fft=1024, freqm=48,
+                              timem=192,
+                              htk=False, fmin=0.0, fmax=None, norm=1, fmin_aug_range=10,
+                              fmax_aug_range=2000)
+    '''
+    net = get_model_passt(arch="passt_s_swa_p16_128_ap476", pretrained=False, n_classes=n_classes, in_channels=1,
+                          fstride=10, tstride=10, input_fdim=128, input_tdim=100, u_patchout=0, s_patchout_t=0,
+                          s_patchout_f=6)
+    """
+       :param arch: Base ViT or Deit architecture
+       :param pretrained: use pretrained model on imagenet
+       :param n_classes: number of classes
+       :param in_channels: number of input channels: 1 for mono
+       :param fstride: the patches stride over frequency.
+       :param tstride: the patches stride over time.
+       :param input_fdim: the expected input frequency bins.
+       :param input_tdim: the expected input time bins.
+       :param u_patchout: number of input patches to drop in Unstructured Patchout as defined in https://arxiv.org/abs/2110.05069
+       :param s_patchout_t: number of input time frames to drop Structured Patchout as defined in https://arxiv.org/abs/2110.05069
+       :param s_patchout_f:  number of input frequency bins to drop Structured Patchout as defined in https://arxiv.org/abs/2110.05069
+       :param audioset_pretrain: use pretrained models on Audioset.
+    """
+    model = PasstBasicWrapper(mel=mel, net=net, **kwargs)
+    return model
 
 
 # 加载预训练权重，网络结构有变化的，对参数作调整
@@ -54,38 +88,12 @@ def load_pretrained_weights(passt, n_classes):
     passt.load_state_dict(passt_dict)
 
 
-def passt(mixstyle_conf, pretrained=True, n_classes=10):
-    model = get_basic_model(mode="logits")  # model包含model.mel和model.net 分别是输入特征提取层和主干网络
-    ''' # model.mel默认为
-    AugmentMelSTFT(n_mels=128, sr=32000, win_length=800, hopsize=320, n_fft=1024, freqm=48,
-                              timem=192,
-                              htk=False, fmin=0.0, fmax=None, norm=1, fmin_aug_range=10,
-                              fmax_aug_range=2000)
-    '''
-    model.mel = AugmentMelSTFT(n_mels=128, sr=32000, win_length=800, hopsize=320, n_fft=1024, freqm=48,
-                               timem=20,
-                               htk=False, fmin=0.0, fmax=None, norm=1, fmin_aug_range=1,
-                               fmax_aug_range=1)
-    """ 
-    :param arch: Base ViT or Deit architecture
-    :param pretrained: use pretrained model on imagenet
-    :param n_classes: number of classes
-    :param in_channels: number of input channels: 1 for mono
-    :param fstride: the patches stride over frequency.
-    :param tstride: the patches stride over time.
-    :param input_fdim: the expected input frequency bins.
-    :param input_tdim: the expected input time bins.
-    :param u_patchout: number of input patches to drop in Unstructured Patchout as defined in https://arxiv.org/abs/2110.05069
-    :param s_patchout_t: number of input time frames to drop Structured Patchout as defined in https://arxiv.org/abs/2110.05069
-    :param s_patchout_f:  number of input frequency bins to drop Structured Patchout as defined in https://arxiv.org/abs/2110.05069
-    :param audioset_pretrain: use pretrained models on Audioset.
-    """
-    passt = get_model_passt(arch="passt_s_swa_p16_128_ap476", n_classes=n_classes, in_channels=1, fstride=10,
-                            tstride=10,
-                            input_fdim=128, input_tdim=100, u_patchout=0, s_patchout_t=0, s_patchout_f=6)
-    if pretrained:
-        load_pretrained_weights(passt, n_classes)
+def passt(mixstyle_conf, pretrained_local=True, n_classes=10):
+    model = get_model_wrapper(n_classes, mode="logits")  # model包含model.mel和model.net 分别是输入特征提取层和主干网络
+    passt = model.net
 
+    if pretrained_local:
+        load_pretrained_weights(passt, n_classes)
     if mixstyle_conf['enable']:
         model.net = nn.Sequential(MixStyle(mixstyle_conf['p'], mixstyle_conf['alpha'], mixstyle_conf['freq']), passt)
     else:
@@ -96,8 +104,8 @@ def passt(mixstyle_conf, pretrained=True, n_classes=10):
 
 if __name__ == '__main__':
     from size_cal import nessi
+    from configs.mixstyle import mixstyle_config
 
-    model = passt(10)
+    model = passt(mixstyle_config, pretrained_local=True, n_classes=10)
     param = model.net.state_dict()
     nessi.get_model_size(model, 'torch', input_size=(1, 32000))
-    # print(param['1.time_new_pos_embed'].shape)
