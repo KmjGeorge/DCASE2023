@@ -1,9 +1,9 @@
 spectrum_config = {
     'sr': 32000,
-    'n_fft': 1024,
-    'win_length': 1000,
-    'hop_length': 500,
-    'n_mels': 128,
+    'n_fft': 2048,
+    'win_length': 2048,
+    'hop_length': 737,
+    'n_mels': 256,
     'freqm': 40,  # specaugment 频率掩膜
     'timem': 20,  # specaugment 时间掩膜
     'fmin': 0.0,  # mel滤波器组的最小频率

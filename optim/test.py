@@ -6,13 +6,13 @@ import matplotlib.pyplot as plt
 from scheduler import GradualWarmupScheduler
 from model_src.rfr_cnn import RFR_CNN
 
-MAX_EPOCH = 200
+MAX_EPOCH = 100
 BATCH_SIZE = 32
 if __name__ == '__main__':
 
     model = RFR_CNN()
 
-    optimizer = AdamW(model.parameters(), lr=1e-5, weight_decay=0.001)
+    optimizer = AdamW(model.parameters(), lr=1e-3, weight_decay=0.001)
 
     # optimizer = SGD(model, 0.1)
 
@@ -20,8 +20,8 @@ if __name__ == '__main__':
     # scheduler_steplr = StepLR(optimizer, step_size=5, gamma=0.1)
 
     # 先逐步增加至初始学习率，然后使用余弦退火
-    scheduler_cos = CosineAnnealingLR(optimizer, T_max=MAX_EPOCH, eta_min=1e-7)
-    scheduler_warmup = GradualWarmupScheduler(optimizer, multiplier=1, total_epoch=20, after_scheduler=scheduler_cos)
+    scheduler_cos = CosineAnnealingLR(optimizer, T_max=MAX_EPOCH-10, eta_min=1e-5)
+    scheduler_warmup = GradualWarmupScheduler(optimizer, multiplier=1, total_epoch=10, after_scheduler=scheduler_cos)
     # optimizer.zero_grad()
     # optimizer.step()
     lr_list = []

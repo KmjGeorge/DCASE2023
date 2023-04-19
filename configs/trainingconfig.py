@@ -23,8 +23,8 @@ normal_training_config = {
 '''
 
 normal_training_config = {
-    'task_name': 'mobileast_light_tau2022_random_silcing__augment_mixup_mixstyle',   # 任务名，用于模型文件和日志命名
-    'epoch': 200,
+    'task_name': 'cp_resnet_tau2022_random_silcing_mixup_mixstyle',   # 任务名，用于模型文件和日志命名
+    'epoch': 100,
     'criterion': nn.CrossEntropyLoss(),
     'optim_config': {
         'name': torch.optim.AdamW,
@@ -38,13 +38,13 @@ normal_training_config = {
         'multiplier': 1,
         'total_epoch': 10,
     },
-    'model': 'mobileast_light',   # 目前可选:cp_resnet, mobileast_s, mobileast_xxs, mobileast_light, rfr-cnn, passt, acdnet
+    'model': 'cp_resnet',   # 目前可选:cp_resnet, mobileast_s, mobileast_xxs, mobileast_light, rfr-cnn, passt, acdnet
 }
 
 
 distillation_config = {
-    'task_name': 'passt+mobileast_light_tau2022_random_slicing_mixup_mixstyle',   # 任务名，用于模型文件和日志命名
-    'epoch': 100,
+    'task_name': 'passt+cp_resnet_tau2022_random_slicing_mixup_mixstyle',   # 任务名，用于模型文件和日志命名
+    'epoch': 150,
     'hard_criterion': nn.CrossEntropyLoss(),
     'soft_criterion': nn.KLDivLoss(reduction='batchmean', log_target=False),
     'optim_config': {
@@ -61,7 +61,7 @@ distillation_config = {
     },
     'teacher_model': 'passt',
     'teacher_weight_path': '../model_weights/passt_tau2022_random_slicing_augment_fpatchout=6_mixup(alpha=0.3)_mixstyle(alpha=0.3,p=0.6)_valacc=59.87.pt',
-    'student_model': 'mobileast_light',
-    'T': 5,      # 蒸馏温度
+    'student_model': 'cp_resnet',
+    'T': 2.5,      # 蒸馏温度
     'alpha': 0.5  # 损失系数
 }

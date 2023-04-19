@@ -27,7 +27,9 @@ def train(model, train_loader, test_loader, start_epoch, normal_training_conf, m
 
     # 先逐步增加至初始学习率，然后使用余弦退火
     optimizer = OPTIM_CONF['name'](model.parameters(), lr=OPTIM_CONF['lr'], weight_decay=OPTIM_CONF['weight_decay'])
-    scheduler_cos = CosineAnnealingLR(optimizer, T_max=MAX_EPOCH, eta_min=SCHEDULER_COS_CONFIG['eta_min'])
+    scheduler_cos = CosineAnnealingLR(optimizer,
+                                      T_max=MAX_EPOCH-SCHEDULER_WARMUP_CONFIG['total_epoch'],
+                                      eta_min=SCHEDULER_COS_CONFIG['eta_min'])
     scheduler_warmup = GradualWarmupScheduler(optimizer, multiplier=SCHEDULER_WARMUP_CONFIG['multiplier'],
                                               total_epoch=SCHEDULER_WARMUP_CONFIG['total_epoch'],
                                               after_scheduler=scheduler_cos)
