@@ -225,7 +225,7 @@ class TAU2022_Random_Slicing(Dataset):
                         # print(data.shape)
                         self.X.append(data)
                         Y.append(TAU2022_CLASSES[label])  # 标签转数字
-                loop.set_description('从h5加载TAU2022_Reassembled数据集...')
+                loop.set_description('从h5加载TAU2022_random_slicing数据集...')
         self.Y = torch.tensor(Y)
 
     def __len__(self):
