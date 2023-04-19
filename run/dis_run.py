@@ -29,7 +29,7 @@ def get_model(name):
     elif name == 'rfr-cnn':
         model = nn.Sequential(ExtractMel(**spectrum_config), RFR_CNN()).to(device)
     elif name == 'passt':
-        model = passt(mixstyle_conf=mixstyle_config, pretrained=False, n_classes=10).to(device)
+        model = passt(mixstyle_conf=mixstyle_config, pretrained_local=False, n_classes=10).to(device)
     elif name == 'acdnet':
         model = GetACDNetModel(mixstyle_conf=mixstyle_config, input_len=32000, nclass=10, sr=spectrum_config['sr'])
     else:

@@ -4,6 +4,7 @@ import torch.nn as nn
 import torchaudio
 import matplotlib.pyplot as plt
 import librosa
+from dataset.augmentation import gauss_noise
 
 
 def plot_waveform(waveform, sample_rate):
@@ -67,11 +68,12 @@ class ExtractMel(nn.Module):
             self.fmax = kwargs['fmax']
         self.hop_length = kwargs['hop_length']
 
-
         self.fmin_aug_range = kwargs['fmin_aug_range']
         self.fmax_aug_range = kwargs['fmax_aug_range']
-        assert kwargs['fmin_aug_range'] >= 1, f"fmin_aug_range={self.fmin_aug_range} should be >=1; 1 means no augmentation"
-        assert kwargs['fmax_aug_range'] >= 1, f"fmax_aug_range={self.fmax_aug_range} should be >=1; 1 means no augmentation"
+        assert kwargs[
+                   'fmin_aug_range'] >= 1, f"fmin_aug_range={self.fmin_aug_range} should be >=1; 1 means no augmentation"
+        assert kwargs[
+                   'fmax_aug_range'] >= 1, f"fmax_aug_range={self.fmax_aug_range} should be >=1; 1 means no augmentation"
 
         self.register_buffer('window',
                              torch.hann_window(kwargs['win_length'], periodic=False),  # Hann窗，窗长为win_length
@@ -87,6 +89,7 @@ class ExtractMel(nn.Module):
             self.timem = torchaudio.transforms.TimeMasking(kwargs['timem'], iid_masks=True)
 
     def forward(self, x):
+        x = gauss_noise(x, snr=20)  # 添加高斯噪声
         x = nn.functional.conv1d(x.unsqueeze(1), self.preemphasis_coefficient).squeeze(1)  # 预加重
 
         x = torch.stft(x, self.n_fft, hop_length=self.hop_length, win_length=self.win_length,  # stft
@@ -122,11 +125,16 @@ class ExtractMel(nn.Module):
 
 if __name__ == '__main__':
     from configs.dataconfig import spectrum_config
+
     # 测试
     extmel = ExtractMel(**spectrum_config)
     batch = []
-    x1, _ = librosa.load('D:/Datasets/TAU-urban-acoustic-scenes-2022-mobile-development/audio/airport-barcelona-0-0-0-a.wav', sr=spectrum_config['sr'])
-    x2, _ = librosa.load('D:/Datasets/TAU-urban-acoustic-scenes-2022-mobile-development/audio/airport-barcelona-0-0-1-a.wav', sr=spectrum_config['sr'])
+    x1, _ = librosa.load(
+        'D:/Datasets/TAU-urban-acoustic-scenes-2022-mobile-development/audio/airport-barcelona-0-0-0-a.wav',
+        sr=spectrum_config['sr'])
+    x2, _ = librosa.load(
+        'D:/Datasets/TAU-urban-acoustic-scenes-2022-mobile-development/audio/airport-barcelona-0-0-1-a.wav',
+        sr=spectrum_config['sr'])
     print(x1.shape)
     plot_waveform(x1[np.newaxis, ...], sample_rate=spectrum_config['sr'])
     batch.append(x1)
@@ -134,6 +142,5 @@ if __name__ == '__main__':
     batch = torch.tensor(batch)
     print(batch.shape)  # (batchsize, sr*time)
     batch = extmel(batch)
-    print(batch.shape)    # (batchsize, C, F, T)  其中C=1, F=n_mels, T=sr*time // hop_length 向上取整
+    print(batch.shape)  # (batchsize, C, F, T)  其中C=1, F=n_mels, T=sr*time // hop_length 向上取整
     plot_spectrogram(batch[0])
-
