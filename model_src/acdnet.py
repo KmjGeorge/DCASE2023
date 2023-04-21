@@ -3,8 +3,7 @@ import torch.nn as nn
 import numpy as np
 import random
 from model_src.module.mixstyle import MixStyle
-
-
+from configs.mixstyle import mixstyle_config
 class ACDNetV2(nn.Module):
     def __init__(self, input_length, n_class, sr, ch_conf=None):
         super(ACDNetV2, self).__init__()
@@ -76,6 +75,8 @@ class ACDNetV2(nn.Module):
         )
 
     def forward(self, x):
+        x = torch.unsqueeze(x, dim=1)
+        x = torch.unsqueeze(x, dim=1)
         x = self.sfeb(x)
         # swapaxes
         x = x.permute((0, 2, 1, 3))
@@ -119,24 +120,12 @@ class ACDNetV2(nn.Module):
         return c
 
 
-def GetACDNetModel(mixstyle_conf, input_len=30225, nclass=50, sr=20000, channel_config=None):
-    if mixstyle_conf['enable']:
-        net = nn.Sequential(MixStyle(mixstyle_conf['p'], mixstyle_conf['alpha'], mixstyle_conf['freq']),
-                            ACDNetV2(input_len, nclass, sr, ch_conf=channel_config))
-    else:
-        net = ACDNetV2(input_len, nclass, sr, ch_conf=channel_config)
-    return net
-
-
-# quantization:
-from torch.quantization import QuantStub, DeQuantStub
-
-
-class ACDNetQuant(nn.Module):
-    def __init__(self, input_length, n_class, sr, ch_conf=None):
-        super(ACDNetQuant, self).__init__()
+class ACDNetV2_MixStyle(nn.Module):
+    def __init__(self, input_length, n_class, sr, mixstyle_conf, ch_conf=None):
+        super(ACDNetV2_MixStyle, self).__init__()
         self.input_length = input_length
         self.ch_config = ch_conf
+        self.mixstyle = MixStyle(p=mixstyle_conf['p'], alpha=mixstyle_conf['alpha'], freq=mixstyle_conf['freq'])
 
         stride1 = 2
         stride2 = 2
@@ -202,18 +191,14 @@ class ACDNetQuant(nn.Module):
             nn.Softmax(dim=1)
         )
 
-        self.quant = QuantStub()
-        self.dequant = DeQuantStub()
-
     def forward(self, x):
-        # Quantize input
-        x = self.quant(x)
+        x = torch.unsqueeze(x, dim=1)
+        x = torch.unsqueeze(x, dim=1)
         x = self.sfeb(x)
+        x = self.mixstyle(x)
         # swapaxes
         x = x.permute((0, 2, 1, 3))
         x = self.tfeb(x)
-        # DeQuantize features before feeding to softmax
-        x = self.dequant(x)
         y = self.output[0](x)
         return y
 
@@ -251,14 +236,19 @@ class ACDNetQuant(nn.Module):
             index += 1
 
         return c
-
-
-def GetACDNetQuantModel(input_len=30225, nclass=50, sr=20000, channel_config=None):
-    net = ACDNetQuant(input_len, nclass, sr, ch_conf=channel_config)
+def GetACDNetModel(mixstyle_conf, input_len=30225, nclass=50, sr=20000, channel_config=None):
+    if mixstyle_conf['enable']:
+        net = ACDNetV2_MixStyle(input_len, nclass, sr, ch_conf=channel_config, mixstyle_conf=mixstyle_conf)
+    else:
+        net = ACDNetV2(input_len, nclass, sr, ch_conf=channel_config)
     return net
 
 
+# quantization:
+from torch.quantization import QuantStub, DeQuantStub
+
+
 if __name__ == '__main__':
-    model = GetACDNetQuantModel(input_len=32000, nclass=10, sr=32000)
+    model = GetACDNetModel(input_len=32000, nclass=10, sr=32000, mixstyle_conf=mixstyle_config)
     from size_cal import nessi
     nessi.get_model_size(model, 'torch', input_size=(1, 1, 1, 32000))  # (batchsize, 1, 1, time*sr)
