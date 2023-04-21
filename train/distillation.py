@@ -112,23 +112,20 @@ def distillation_per_epoch(student, teacher, train_loader, hard_criterion, soft_
         # 计算soft_loss
         with torch.no_grad():
             teacher_pred = teacher(x)
-        y_pred_log_softmax = F.log_softmax(y_pred_nomix, dim=1)  # 学生不使用温度(参考arXiv:2203.06760v1)
+        y_pred_log_softmax = F.log_softmax(y_pred_nomix / T, dim=1)
         teacher_pred_softmax = F.softmax(teacher_pred / T, dim=1)
         soft_loss = soft_criterion(y_pred_log_softmax,
                                    teacher_pred_softmax)  # 注意torch的KL散度中，模型预测结果取log_softmax，而教师预测结果取softmax(如果log_target=False)
         
         # 总loss
-        loss = alpha * hard_loss + (1 - alpha) * soft_loss
+        loss = hard_loss + alpha * soft_loss
         loss.backward()
         optimizer.step()
         lr = optimizer.param_groups[0]['lr']
 
         # 计算训练loss和acc（每批）
         with torch.no_grad():
-            if not mixup_conf['enable']:
-                y_ = torch.argmax(y_pred_nomix, dim=1)
-            else:
-                y_ = torch.argmax(y_pred_nomix, dim=1)  # 使用非mixup的数据计算acc
+            y_ = torch.argmax(y_pred_nomix, dim=1)  # 使用非mixup的数据计算acc
             correct += (y_ == y).sum().item()
             total += y.size(0)
             sum_loss += loss.item()

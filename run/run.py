@@ -66,7 +66,6 @@ def setup_seed(seed):
     random.seed(seed)
     torch.backends.cudnn.deterministic = True
 
-
 if __name__ == '__main__':
     '''1. 读取配置'''
     from configs.dataconfig import dataset_config, spectrum_config

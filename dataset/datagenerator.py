@@ -36,6 +36,9 @@ TAU2022_CLASSES = {'airport': 0,
                    'street_traffic': 8,
                    'tram': 9
                    }
+TAU2022_DEVICES = {
+
+}
 
 
 # 从文件读取urbansound8k数据集
@@ -64,8 +67,8 @@ class UrbanSound8K(Dataset):
 
     def __getitem__(self, idx):
         audio, sr = librosa.load(self.X[idx], sr=SR)
-        if audio.shape[0] != SR*4:  # 超出4s的裁剪为4s
-            audio = audio[:SR*4]
+        if audio.shape[0] != SR * 4:  # 超出4s的裁剪为4s
+            audio = audio[:SR * 4]
 
         label = self.Y[idx]
         return audio, label
@@ -132,6 +135,44 @@ def make_tau2022(meta_path, h5_path):
             except:
                 label_group.create_dataset('x', data=[data], maxshape=(None, SR), chunks=True)
         loop2.set_description('制作tau2022 h5数据集...')
+    print('数据保存至 {}'.format(h5_path))
+
+
+def make_tau2022_reassembled_with_device(meta_path,  h5_path):
+    assert not os.path.exists(h5_path), "文件{}已存在！".format(h5_path)
+    df = pd.read_csv(meta_path)
+    df2 = pd.read_csv(dataset_config['meta_path'])
+    X = []
+    Y = []
+    Z = []
+    loop = tqdm(df['filename'])
+    for filename in loop:
+        scene_label = df[df['filename'] == filename]['scene_label'].values[0]
+        source_label = df2[df2['filename'] == filename]['source_label'].values[0]
+        full_path = os.path.join(AUDIO_PATH, filename)
+        audio, _ = librosa.load(full_path, sr=SR)
+        X.append(audio)
+        Y.append(scene_label)
+        Z.append(source_label)
+        loop.set_description('从audio文件读取tau2022_reassembled数据集...')
+
+    loop2 = tqdm(range(len(X)))
+    for i in loop2:
+        data = np.array(X[i])
+        label = Y[i]
+        device_label = np.array(Z[i])
+        with h5py.File(h5_path, 'a') as f:
+            try:
+                label_group = f[label]
+            except:
+                label_group = f.create_group(label)
+            try:
+                dataset = label_group['x']
+                dataset.resize((dataset.shape[0] + 1, dataset.shape[1]))
+                dataset[-1] = data
+            except:
+                label_group.create_dataset('x', data=[data, device_label], maxshape=(None, SR), chunks=True)
+        loop2.set_description('制作tau2022_reassembled(with device) h5数据集...')
     print('数据保存至 {}'.format(h5_path))
 
 
@@ -297,6 +338,7 @@ def get_tau2022_reassembled_random_slicing():
 
 
 if __name__ == '__main__':
+    '''
     if dataset_config['name'] == 'tau2022':
         train_h5 = os.path.join(H5PATH, 'tau2022_train.h5')
         test_h5 = os.path.join(H5PATH, 'tau2022_test.h5')
@@ -314,7 +356,13 @@ if __name__ == '__main__':
         make_tau2022_reassembled(test_csv, test_h5)
     else:
         raise '数据集名称错误!'
-
+    '''
+    train_h5 = os.path.join(H5PATH, 'tau2022_reassembled(with device)_train.h5')
+    test_h5 = os.path.join(H5PATH, 'tau2022_reassembled(with device)_test.h5')
+    train_csv = os.path.split(META_PATH)[0] + '/evaluation_setup/fold1_train.csv'
+    test_csv = os.path.split(META_PATH)[0] + '/evaluation_setup/fold1_evaluate.csv'
+    make_tau2022_reassembled_with_device(train_csv, train_h5)
+    make_tau2022_reassembled_with_device(test_csv, test_h5)
 
     '''原版TAU2022数据集调用
     TAU2022_train, TAU2022_test = get_tau2022()

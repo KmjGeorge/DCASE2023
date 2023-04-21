@@ -89,7 +89,7 @@ class ExtractMel(nn.Module):
             self.timem = torchaudio.transforms.TimeMasking(kwargs['timem'], iid_masks=True)
 
     def forward(self, x):
-        x = gauss_noise(x, snr=20)  # 添加高斯噪声
+        # x = gauss_noise(x, snr=20)  # 添加高斯噪声
         x = nn.functional.conv1d(x.unsqueeze(1), self.preemphasis_coefficient).squeeze(1)  # 预加重
 
         x = torch.stft(x, self.n_fft, hop_length=self.hop_length, win_length=self.win_length,  # stft
