@@ -4,9 +4,10 @@ from torch.optim.lr_scheduler import CosineAnnealingLR
 from optim.scheduler import GradualWarmupScheduler
 import torch.nn as nn
 from tqdm import tqdm
-from dataset.augmentation import mixup
+from dataset.augmentation import mixup, cutmix
 import pandas as pd
 from dataset.datagenerator import TAU2022_DEVICES, TAU2022_DEVICES_INVERT
+import numpy as np
 
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
@@ -97,17 +98,22 @@ def train_per_epoch(model, train_loader, criterion, optimizer, scheduler, start_
             y_pred = model(x)
             loss = criterion(y_pred, y)
         else:
-            x_mix, y_a, y_b, lamb = mixup(x, y, mixup_conf['alpha'])
-            x_mix = x_mix.to(device)
-            y_a = y_a.to(device)
-            y_b = y_b.to(device)
+            if np.random.rand(1) < mixup_conf['p']:
+                if mixup_conf['cut']:  # 使用cutmix
+                    x_mix, y_a, y_b, lamb = cutmix(x, y, mixup_conf['alpha'])
+                else:
+                    x_mix, y_a, y_b, lamb = mixup(x, y, mixup_conf['alpha'])
+                x_mix = x_mix.to(device)
+                y_a = y_a.to(device)
+                y_b = y_b.to(device)
 
-            optimizer.zero_grad()
-            y_pred = model(x_mix)
-            # print('y_a.shape=', y_a.shape)
-            # print('y_b.shape=', y_b.shape)
-            # print('y_pred.shape=', y_pred.shape)
-            loss = lamb * criterion(y_pred, y_a) + (1 - lamb) * criterion(y_pred, y_b)
+                optimizer.zero_grad()
+                y_pred = model(x_mix)
+                loss = lamb * criterion(y_pred, y_a) + (1 - lamb) * criterion(y_pred, y_b)
+            else:
+                optimizer.zero_grad()
+                y_pred = model(x)
+                loss = criterion(y_pred, y)
 
         loss.backward()
         optimizer.step()
@@ -126,7 +132,7 @@ def train_per_epoch(model, train_loader, criterion, optimizer, scheduler, start_
             running_acc = correct / total
 
         # 输出训练信息
-        loop.set_description(f'Epoch [{start_epoch + epoch + 1}/{epochs}]')
+        loop.set_description(f'Epoch [{start_epoch + epoch + 1}/{start_epoch + epochs}]')
         loop.set_postfix(lr=lr, loss=running_loss, acc=running_acc)
     scheduler.step()  # 更新学习率
     epoch_loss = sum_loss / total

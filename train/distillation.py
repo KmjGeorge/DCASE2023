@@ -4,7 +4,8 @@ import torch
 from torch.optim.lr_scheduler import CosineAnnealingLR
 from optim.scheduler import GradualWarmupScheduler
 from tqdm import tqdm
-from dataset.augmentation import mixup
+from dataset.augmentation import mixup,cutmix
+import numpy as np
 from train.normal_train import validate
 import pandas as pd
 from dataset.datagenerator import TAU2022_DEVICES, TAU2022_DEVICES_INVERT
@@ -111,14 +112,19 @@ def distillation_per_epoch(student, teacher, train_loader, hard_criterion, soft_
             optimizer.zero_grad()
             hard_loss = hard_criterion(y_pred_nomix, y)
         else:
-            x_mix, y_a, y_b, lamb = mixup(x, y, mixup_conf['alpha'])
-            x_mix = x_mix.to(device)
-            y_a = y_a.to(device)
-            y_b = y_b.to(device)
-
-            optimizer.zero_grad()
-            y_pred_mix = student(x_mix)
-            hard_loss = lamb * hard_criterion(y_pred_mix, y_a) + (1 - lamb) * hard_criterion(y_pred_mix, y_b)
+            if np.random.rand(1) < mixup_conf['p']:
+                if mixup_conf['cut']:
+                    x_mix, y_a, y_b, lamb = cutmix(x, y, mixup_conf['alpha'])
+                else:
+                    x_mix, y_a, y_b, lamb = mixup(x, y, mixup_conf['alpha'])
+                x_mix = x_mix.to(device)
+                y_a = y_a.to(device)
+                y_b = y_b.to(device)
+                optimizer.zero_grad()
+                y_pred_mix = student(x_mix)
+                hard_loss = lamb * hard_criterion(y_pred_mix, y_a) + (1 - lamb) * hard_criterion(y_pred_mix, y_b)
+            else:
+                hard_loss = hard_criterion(y_pred_nomix, y)
 
         # 计算soft_loss
         with torch.no_grad():
