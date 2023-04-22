@@ -4,9 +4,9 @@ from torch.optim.lr_scheduler import CosineAnnealingLR
 from optim.scheduler import GradualWarmupScheduler
 import torch.nn as nn
 from tqdm import tqdm
-from dataset.augmentation import mixup, cutmix
+from dataset.augmentation import mixup
 import pandas as pd
-import numpy as np
+
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
 
@@ -86,26 +86,17 @@ def train_per_epoch(model, train_loader, criterion, optimizer, scheduler, start_
             y_pred = model(x)
             loss = criterion(y_pred, y)
         else:
-            mixup_p = np.random.rand(1)
-            if mixup_p < mixup_conf['p']:
-                if mixup_conf['cut']:   # 使用cutmix
-                    x_mix, y_a, y_b, lamb = cutmix(x, y, mixup_conf['alpha'])
-                else:
-                    x_mix, y_a, y_b, lamb = mixup(x, y, mixup_conf['alpha'])
-                x_mix = x_mix.to(device)
-                y_a = y_a.to(device)
-                y_b = y_b.to(device)
+            x_mix, y_a, y_b, lamb = mixup(x, y, mixup_conf['alpha'])
+            x_mix = x_mix.to(device)
+            y_a = y_a.to(device)
+            y_b = y_b.to(device)
 
-                optimizer.zero_grad()
-                y_pred = model(x_mix)
-                # print('y_a.shape=', y_a.shape)
-                # print('y_b.shape=', y_b.shape)
-                # print('y_pred.shape=', y_pred.shape)
-                loss = lamb * criterion(y_pred, y_a) + (1 - lamb) * criterion(y_pred, y_b)
-            else:
-                optimizer.zero_grad()
-                y_pred = model(x)
-                loss = criterion(y_pred, y)
+            optimizer.zero_grad()
+            y_pred = model(x_mix)
+            # print('y_a.shape=', y_a.shape)
+            # print('y_b.shape=', y_b.shape)
+            # print('y_pred.shape=', y_pred.shape)
+            loss = lamb * criterion(y_pred, y_a) + (1 - lamb) * criterion(y_pred, y_b)
 
         loss.backward()
         optimizer.step()
