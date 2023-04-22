@@ -85,6 +85,7 @@ if __name__ == '__main__':
     '''2. 获取模型'''
     teacher = get_model(TEACHER_MODEL)
     student = get_model(STUDENT_MODEL)
+    student.load_state_dict(torch.load('../model_weights/alter_passt+cp_resnet_tau2022_random_slicing_mixup(alpha=0.3)_mixstyle(alpha=0.3, p=0.8), T=2, soft_loss_alpha=50_epoch200.pt'))
     teacher.load_state_dict(torch.load(TEACHER_WEIGHT_PATH))
 
     '''3. 计算模型大小，需指定输入形状 (batch, sr*time) '''
@@ -97,8 +98,6 @@ if __name__ == '__main__':
         train_dataloader, test_dataloader = dataset.datagenerator.get_tau2022_reassembled_random_slicing()
     elif DATASET_NAME == 'TAU2022' or DATASET_NAME == 'tau2022':
         train_dataloader, test_dataloader = dataset.datagenerator.get_tau2022()
-    elif DATASET_NAME == 'urbansound8k' or DATASET_NAME == 'URBANSOUND8K':
-        train_dataloader, test_dataloader = dataset.datagenerator.get_urbansound8k(fold_shuffle=True)
     elif DATASET_NAME == 'TAU2022_REASSEMBLED' or DATASET_NAME == 'tau2022_reassembled':
         train_dataloader, test_dataloader = dataset.datagenerator.get_tau2022_reassembled()
     else:
@@ -108,7 +107,7 @@ if __name__ == '__main__':
     loss_list, acc_list, val_loss_list, val_acc_list = train.distillation.distillation(student=student, teacher=teacher,
                                                                                        train_loader=train_dataloader,
                                                                                        test_loader=test_dataloader,
-                                                                                       start_epoch=0,
+                                                                                       start_epoch=200,
                                                                                        distillation_conf=distillation_config,
                                                                                        mixup_conf=mixup_config,
                                                                                        save=True)

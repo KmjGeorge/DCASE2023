@@ -7,6 +7,7 @@ from tqdm import tqdm
 from dataset.augmentation import mixup
 from train.normal_train import validate
 import pandas as pd
+from dataset.datagenerator import TAU2022_DEVICES, TAU2022_DEVICES_INVERT
 
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
@@ -57,7 +58,7 @@ def distillation(student, teacher, train_loader, test_loader, start_epoch, disti
             mixup_conf=mixup_conf,
             save=save)
         # 每轮验证一次
-        val_epoch_loss, val_epoch_acc = validate(
+        val_epoch_loss, val_epoch_acc, test_device_info = validate(
             model=student,
             test_loader=test_loader,
             criterion=hard_criterion)
@@ -70,7 +71,17 @@ def distillation(student, teacher, train_loader, test_loader, start_epoch, disti
             logs = pd.DataFrame({'loss': loss_list,
                                  'acc': acc_list,
                                  'val_loss': val_loss_list,
-                                 'val_acc': val_acc_list}
+                                 'val_acc': val_acc_list,
+                                 'a_acc': test_device_info['a'][2],
+                                 'b_acc': test_device_info['b'][2],
+                                 'c_acc': test_device_info['c'][2],
+                                 's1_acc': test_device_info['s1'][2],
+                                 's2_acc': test_device_info['s2'][2],
+                                 's3_acc': test_device_info['s3'][2],
+                                 's4_acc': test_device_info['s4'][2],
+                                 's5_acc': test_device_info['s5'][2],
+                                 's6_acc': test_device_info['s6'][2],
+                                 }
                                 )
             logs.to_csv('../logs/{}_logs.csv'.format(TASK_NAME), index=True)
     print('==========Finished Training===========')
@@ -90,9 +101,9 @@ def distillation_per_epoch(student, teacher, train_loader, hard_criterion, soft_
     student.train()
 
     loop = tqdm(train_loader)
-    for x, y in loop:
+    for x, y, z in loop:
         x = x.to(device)
-        y = y.to(device)
+        y = y.long().to(device)
 
         # 计算hard_loss
         y_pred_nomix = student(x)
@@ -133,7 +144,7 @@ def distillation_per_epoch(student, teacher, train_loader, hard_criterion, soft_
             running_acc = correct / total
 
         # 输出训练信息
-        loop.set_description(f'Epoch [{start_epoch + epoch + 1}/{epochs}]')
+        loop.set_description(f'Epoch [{start_epoch + epoch + 1}/{epochs + start_epoch}]')
         loop.set_postfix(lr=lr, loss=running_loss, acc=running_acc)
     scheduler.step()  # 更新学习率
     epoch_loss = sum_loss / total
@@ -150,13 +161,15 @@ def validate(model, test_loader, criterion):
     test_correct = 0
     test_total = 0
     test_sum_loss = 0
+    test_device_info = {k: [0, 0, 0.0] for k in TAU2022_DEVICES.keys()}  # key:设备标签 v: [total_num, correct_num, acc]
+
     model.eval()
 
     with torch.no_grad():
         loop = tqdm(test_loader, desc='Validation')
-        for x, y in loop:
+        for x, y, z in loop:
             x = x.to(device)
-            y = y.to(device)
+            y = y.long().to(device)
             y_pred = model(x)
             loss = criterion(y_pred, y)
             y_ = torch.argmax(y_pred, dim=1)
@@ -166,11 +179,29 @@ def validate(model, test_loader, criterion):
             test_running_loss = test_sum_loss / test_total
             test_running_acc = test_correct / test_total
 
+            # 计算每个设备的准确率
+            for i, source_label in enumerate(z):
+                key = TAU2022_DEVICES_INVERT[int(source_label)]
+                test_device_info[key][0] += 1
+                if (y == y_)[i]:
+                    test_device_info[key][1] += 1
+                test_device_info[key][2] = test_device_info[key][1] / test_device_info[key][0]
+
             # 输出验证信息
-            loop.set_postfix(val_loss=test_running_loss, val_acc=test_running_acc)
+            loop.set_postfix(val_loss=test_running_loss, val_acc=test_running_acc,
+                             A=test_device_info['a'][2],
+                             B=test_device_info['b'][2],
+                             C=test_device_info['c'][2],
+                             S1=test_device_info['s1'][2],
+                             S2=test_device_info['s2'][2],
+                             S3=test_device_info['s3'][2],
+                             S4=test_device_info['s4'][2],
+                             S5=test_device_info['s5'][2],
+                             S6=test_device_info['s6'][2],
+                             )
 
     test_epoch_loss = test_sum_loss / test_total
     test_epoch_acc = test_correct / test_total
     model.train()
 
-    return test_epoch_loss, test_epoch_acc
+    return test_epoch_loss, test_epoch_acc, test_device_info

@@ -6,6 +6,7 @@ import torch.nn as nn
 from tqdm import tqdm
 from dataset.augmentation import mixup
 import pandas as pd
+from dataset.datagenerator import TAU2022_DEVICES, TAU2022_DEVICES_INVERT
 
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
@@ -28,7 +29,7 @@ def train(model, train_loader, test_loader, start_epoch, normal_training_conf, m
     # 先逐步增加至初始学习率，然后使用余弦退火
     optimizer = OPTIM_CONF['name'](model.parameters(), lr=OPTIM_CONF['lr'], weight_decay=OPTIM_CONF['weight_decay'])
     scheduler_cos = CosineAnnealingLR(optimizer,
-                                      T_max=MAX_EPOCH-SCHEDULER_WARMUP_CONFIG['total_epoch'],
+                                      T_max=MAX_EPOCH - SCHEDULER_WARMUP_CONFIG['total_epoch'],
                                       eta_min=SCHEDULER_COS_CONFIG['eta_min'])
     scheduler_warmup = GradualWarmupScheduler(optimizer, multiplier=SCHEDULER_WARMUP_CONFIG['multiplier'],
                                               total_epoch=SCHEDULER_WARMUP_CONFIG['total_epoch'],
@@ -49,7 +50,7 @@ def train(model, train_loader, test_loader, start_epoch, normal_training_conf, m
             mixup_conf=mixup_conf,
             save=save)
         # 每轮验证一次
-        val_epoch_loss, val_epoch_acc = validate(
+        val_epoch_loss, val_epoch_acc, test_device_info = validate(
             model=model,
             test_loader=test_loader,
             criterion=criterion)
@@ -58,12 +59,21 @@ def train(model, train_loader, test_loader, start_epoch, normal_training_conf, m
         acc_list.append(epoch_acc)
         val_loss_list.append(val_epoch_loss)
         val_acc_list.append(val_epoch_acc)
-        if save:                                              # 保存训练日志
+        if save:  # 保存训练日志
             logs = pd.DataFrame({'loss': loss_list,
                                  'acc': acc_list,
                                  'val_loss': val_loss_list,
-                                 'val_acc': val_acc_list}
-                                )
+                                 'val_acc': val_acc_list,
+                                 'val_A_acc': test_device_info['a'][2],
+                                 'val_B_acc': test_device_info['b'][2],
+                                 'val_C_acc': test_device_info['c'][2],
+                                 'val_S1_acc': test_device_info['s1'][2],
+                                 'val_S2_acc': test_device_info['s2'][2],
+                                 'val_S3_acc': test_device_info['s3'][2],
+                                 'val_S4_acc': test_device_info['s4'][2],
+                                 'val_S5_acc': test_device_info['s5'][2],
+                                 'val_S6_acc': test_device_info['s6'][2],
+                                 })
             logs.to_csv('../logs/{}_logs.csv'.format(TASK_NAME), index=True)
     print('==========Finished Training===========')
     return loss_list, acc_list, val_loss_list, val_acc_list
@@ -75,12 +85,13 @@ def train_per_epoch(model, train_loader, criterion, optimizer, scheduler, start_
     correct = 0
     total = 0
     sum_loss = 0.0
+
     model.train()
 
     loop = tqdm(train_loader)
-    for x, y in loop:
+    for x, y, z in loop:
         x = x.to(device)
-        y = y.to(device)
+        y = y.long().to(device)
         if not mixup_conf['enable']:  # 不使用mixup
             optimizer.zero_grad()
             y_pred = model(x)
@@ -130,13 +141,16 @@ def validate(model, test_loader, criterion):
     test_correct = 0
     test_total = 0
     test_sum_loss = 0
+
+    test_device_info = {k: [0, 0, 0.0] for k in TAU2022_DEVICES.keys()}  # key:设备标签 v: [total_num, correct_num, acc]
+
     model.eval()
 
     with torch.no_grad():
         loop = tqdm(test_loader, desc='Validation')
-        for x, y in loop:
+        for x, y, z in loop:
             x = x.to(device)
-            y = y.to(device)
+            y = y.long().to(device)
             y_pred = model(x)
             loss = criterion(y_pred, y)
             y_ = torch.argmax(y_pred, dim=1)
@@ -146,11 +160,30 @@ def validate(model, test_loader, criterion):
             test_running_loss = test_sum_loss / test_total
             test_running_acc = test_correct / test_total
 
+            # 计算每个设备的准确率
+            for i, source_label in enumerate(z):
+                key = TAU2022_DEVICES_INVERT[int(source_label)]
+                test_device_info[key][0] += 1
+                if (y == y_)[i]:
+                    test_device_info[key][1] += 1
+                test_device_info[key][2] = test_device_info[key][1] / test_device_info[key][0]
+
             # 输出验证信息
-            loop.set_postfix(val_loss=test_running_loss, val_acc=test_running_acc)
+            loop.set_postfix(val_loss=test_running_loss, val_acc=test_running_acc,
+                             A=test_device_info['a'][2],
+                             B=test_device_info['b'][2],
+                             C=test_device_info['c'][2],
+                             S1=test_device_info['s1'][2],
+                             S2=test_device_info['s2'][2],
+                             S3=test_device_info['s3'][2],
+                             S4=test_device_info['s4'][2],
+                             S5=test_device_info['s5'][2],
+                             S6=test_device_info['s6'][2],
+                             )
 
     test_epoch_loss = test_sum_loss / test_total
     test_epoch_acc = test_correct / test_total
+
     model.train()
 
-    return test_epoch_loss, test_epoch_acc
+    return test_epoch_loss, test_epoch_acc, test_device_info
