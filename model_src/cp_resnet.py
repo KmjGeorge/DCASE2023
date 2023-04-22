@@ -338,7 +338,7 @@ def cp_resnet(mixstyle_conf):
 
     from model_src.module.mixstyle import MixStyle
     if mixstyle_conf['enable']:
-        return nn.Sequential(MixStyle(mixstyle_conf['p'], mixstyle_conf['alpha'], mixstyle_conf['freq']), Network(model_config))
+        return nn.Sequential(MixStyle(p=mixstyle_conf['p'], alpha=mixstyle_conf['alpha'], freq=mixstyle_conf['freq']), Network(model_config))
     else:
         return Network(model_config)
 

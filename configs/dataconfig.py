@@ -1,11 +1,11 @@
 spectrum_config = {
     'sr': 32000,
     'n_fft': 2048,
-    'win_length': 2048,
-    'hop_length': 737,
-    'n_mels': 256,
-    'freqm': 40,  # specaugment 频率掩膜
-    'timem': 20,  # specaugment 时间掩膜
+    'win_length': 2000,
+    'hop_length': 500,
+    'n_mels': 128,
+    'freqm': 20,  # specaugment 频率掩膜
+    'timem': 10,  # specaugment 时间掩膜
     'fmin': 0.0,  # mel滤波器组的最小频率
     'fmax': None,  # mel滤波器组的最大频率，None为自动配置至sr // 2 - fmax_aug_range // 2
     'fmin_aug_range': 1,  # mel滤波器频率随机偏移范围 最小值

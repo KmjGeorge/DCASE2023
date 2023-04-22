@@ -66,7 +66,6 @@ def setup_seed(seed):
     random.seed(seed)
     torch.backends.cudnn.deterministic = True
 
-
 if __name__ == '__main__':
     '''1. 读取配置'''
     from configs.dataconfig import dataset_config, spectrum_config
@@ -87,14 +86,13 @@ if __name__ == '__main__':
 
     '''3. 计算模型大小，需指定输入形状 (batch, sr*time) '''
     nessi.get_model_size(model, 'torch', input_size=(1, spectrum_config['sr'] * 1))
+
     '''4. 获取数据集'''
     # 请先在dataset.datagenerator中生成数据集(h5形式)
     if DATASET_NAME == 'TAU2022_RANDOM_SLICING' or DATASET_NAME == 'tau2022_random_slicing':
         train_dataloader, test_dataloader = dataset.datagenerator.get_tau2022_reassembled_random_slicing()
     elif DATASET_NAME == 'TAU2022' or DATASET_NAME == 'tau2022':
         train_dataloader, test_dataloader = dataset.datagenerator.get_tau2022()
-    elif DATASET_NAME == 'urbansound8k' or DATASET_NAME == 'URBANSOUND8K':
-        train_dataloader, test_dataloader = dataset.datagenerator.get_urbansound8k(fold_shuffle=True)
     elif DATASET_NAME == 'TAU2022_REASSEMBLED' or DATASET_NAME == 'tau2022_reassembled':
         train_dataloader, test_dataloader = dataset.datagenerator.get_tau2022_reassembled()
     else:

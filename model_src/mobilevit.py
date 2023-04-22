@@ -488,7 +488,7 @@ def mobileast_xxs(mixstyle_conf):
     channels = [16, 16, 24, 24, 48, 48, 64, 64, 80, 80, 320]
     # 频谱参数改变导致输入维度改变的时候，这里(128, 64)也要随之改变
     if mixstyle_conf['enable']:
-        return nn.Sequential(MixStyle(mixstyle_conf['p'], mixstyle_conf['alpha'], mixstyle_conf['freq']),
+        return nn.Sequential(MixStyle(p=mixstyle_conf['p'], alpha=mixstyle_conf['alpha'], freq=mixstyle_conf['freq']),
                              MobileAST((128, 64), dims, channels,
                                        num_classes=10,
                                        expansion=2, kernel_size=(3, 3), patch_size=(2, 2)))
@@ -499,7 +499,7 @@ def mobileast_xxs(mixstyle_conf):
 
 def mobileast_light(mixstyle_conf):
     if mixstyle_conf['enable']:
-        return nn.Sequential(MixStyle(mixstyle_conf['p'], mixstyle_conf['alpha'], mixstyle_conf['freq']),
+        return nn.Sequential(MixStyle(p=mixstyle_conf['p'], alpha=mixstyle_conf['alpha'], freq=mixstyle_conf['freq']),
                              MobileAST_Light((128, 64), num_classes=10, kernel_size=(3, 3), patch_size=(2, 2)).to(
                                  device))
     else:
@@ -511,7 +511,7 @@ def mobileast_s(mixstyle_conf):
     channels = [16, 32, 64, 64, 96, 96, 128, 128, 160, 160, 640]
     from model_src.module.mixstyle import MixStyle
     if mixstyle_conf['enable']:
-        return nn.Sequential(MixStyle(mixstyle_conf['p'], mixstyle_conf['alpha'], mixstyle_conf['freq']),
+        return nn.Sequential(MixStyle(p=mixstyle_conf['p'], alpha=mixstyle_conf['alpha'], freq=mixstyle_conf['freq']),
                              MobileAST((128, 64), dims, channels, num_classes=10, kernel_size=(3, 3),
                                        patch_size=(2, 2)))
 
