@@ -11,10 +11,11 @@ import pandas as pd
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
 
-def distillation(student, teacher, train_loader, test_loader, start_epoch, distillation_conf, mixup_conf,
+def distillation(student, teacher, train_loader, test_loader, distillation_conf, mixup_conf,
                  save=True):
     TASK_NAME = distillation_conf['task_name']
     MAX_EPOCH = distillation_conf['epoch']
+    START_EPOCH = distillation_conf['start_epoch']
     OPTIM_CONF = distillation_conf['optim_config']
     SCHEDULER_COS_CONFIG = distillation_conf['scheduler_cos_config']
     SCHEDULER_WARMUP_CONFIG = distillation_conf['scheduler_warmup_config']
@@ -50,7 +51,7 @@ def distillation(student, teacher, train_loader, test_loader, start_epoch, disti
             scheduler=scheduler_warmup,
             T=T,
             alpha=alpha,
-            start_epoch=start_epoch,
+            start_epoch=START_EPOCH,
             epoch=i,
             epochs=MAX_EPOCH,
             save_name=TASK_NAME,

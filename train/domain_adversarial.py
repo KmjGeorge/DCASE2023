@@ -79,7 +79,7 @@ def da_train(model, train_loader, test_loader, start_epoch, normal_training_conf
 
 
 def da_train_per_epoch(model, train_loader, criterion, optimizer, scheduler, start_epoch, epoch, epochs, save_name,
-                    mixup_conf,
+                    mixup_conf, gamma,
                     save=True):
     correct = 0
     total = 0
@@ -91,10 +91,14 @@ def da_train_per_epoch(model, train_loader, criterion, optimizer, scheduler, sta
     for x, y, z in loop:
         x = x.to(device)
         y = y.long().to(device)
-        if not mixup_conf['enable']:  # 不使用mixup
+        y_pred_nomix, z_pred_nomix = model(x)  # 输出为两个，一个是class标签，一个是设备标签
+        if not mixup_conf['enable']:
             optimizer.zero_grad()
-            y_pred = model(x)
-            loss = criterion(y_pred, y)
+            y_pred = y_pred_nomix
+            z_pred = z_pred_nomix
+            loss_class = criterion(y_pred, y)
+            loss_device = criterion(z_pred, z)
+            loss = loss_class + gamma*loss_device
         else:
             if np.random.rand(1) < mixup_conf['p']:
                 if mixup_conf['cut']:  # 使用cutmix
@@ -106,11 +110,10 @@ def da_train_per_epoch(model, train_loader, criterion, optimizer, scheduler, sta
                 y_b = y_b.to(device)
 
                 optimizer.zero_grad()
-                y_pred = model(x_mix)
-                loss = lamb * criterion(y_pred, y_a) + (1 - lamb) * criterion(y_pred, y_b)
+                y_pred, z_pred = model(x_mix)
             else:
                 optimizer.zero_grad()
-                y_pred = model(x)
+                y_pred = y_pred_nomix
                 loss = criterion(y_pred, y)
 
         loss.backward()
@@ -119,10 +122,7 @@ def da_train_per_epoch(model, train_loader, criterion, optimizer, scheduler, sta
 
         # 计算训练loss和acc（每批）
         with torch.no_grad():
-            if mixup_conf['alpha'] == 0:
-                y_ = torch.argmax(y_pred, dim=1)
-            else:
-                y_ = torch.argmax(model(x), dim=1)  # 使用非mixup的数据计算acc
+            y_ = torch.argmax(y_pred_nomix, dim=1)
             correct += (y_ == y).sum().item()
             total += y.size(0)
             sum_loss += loss.item()

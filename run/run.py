@@ -104,7 +104,6 @@ if __name__ == '__main__':
     # model.load_state_dict(weights)
     loss_list, acc_list, val_loss_list, val_acc_list = train.normal_train.train(model, train_dataloader,
                                                                                 test_dataloader,
-                                                                                start_epoch=0,
                                                                                 normal_training_conf=normal_training_config,
                                                                                 mixup_conf=mixup_config,
                                                                                 save=True)

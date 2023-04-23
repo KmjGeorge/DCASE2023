@@ -3,7 +3,7 @@ spectrum_config = {
     'n_fft': 2048,
     'win_length': 2000,
     'hop_length': 500,
-    'n_mels': 128,
+    'n_mels': 256,
     'freqm': 20,  # specaugment 频率掩膜
     'timem': 10,  # specaugment 时间掩膜
     'fmin': 0.0,  # mel滤波器组的最小频率
@@ -47,14 +47,3 @@ dataset_config = {
 }
 '''
 
-"""
-dataset_config = {
-    'name': 'urbansound8k',
-    'batch_size': 64,
-    'meta_path': 'D:/datasets/urbansound8k/metadata/urbansound8k.csv',
-    'audio_path': 'D:/datasets/urbansound8k/audio/',
-    'num_classes': 10,
-    'h5path': None,
-    'shuffle': True,
-}
-"""

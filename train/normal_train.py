@@ -13,7 +13,7 @@ device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
 
 # 定义普通的训练过程
-def train(model, train_loader, test_loader, start_epoch, normal_training_conf, mixup_conf,
+def train(model, train_loader, test_loader, normal_training_conf, mixup_conf,
           save=True):
     loss_list = []
     acc_list = []
@@ -22,6 +22,7 @@ def train(model, train_loader, test_loader, start_epoch, normal_training_conf, m
 
     TASK_NAME = normal_training_conf['task_name']
     MAX_EPOCH = normal_training_conf['epoch']
+    START_EPOCH = normal_training_conf['start_epoch']
     OPTIM_CONF = normal_training_conf['optim_config']
     SCHEDULER_COS_CONFIG = normal_training_conf['scheduler_cos_config']
     SCHEDULER_WARMUP_CONFIG = normal_training_conf['scheduler_warmup_config']
@@ -44,7 +45,7 @@ def train(model, train_loader, test_loader, start_epoch, normal_training_conf, m
             criterion=criterion,
             optimizer=optimizer,
             scheduler=scheduler_warmup,
-            start_epoch=start_epoch,
+            start_epoch=START_EPOCH,
             epoch=i,
             epochs=MAX_EPOCH,
             save_name=TASK_NAME,
@@ -93,9 +94,10 @@ def train_per_epoch(model, train_loader, criterion, optimizer, scheduler, start_
     for x, y, z in loop:
         x = x.to(device)
         y = y.long().to(device)
+        y_pred_nomix = model(x)
         if not mixup_conf['enable']:  # 不使用mixup
             optimizer.zero_grad()
-            y_pred = model(x)
+            y_pred = y_pred_nomix
             loss = criterion(y_pred, y)
         else:
             if np.random.rand(1) < mixup_conf['p']:
@@ -112,7 +114,7 @@ def train_per_epoch(model, train_loader, criterion, optimizer, scheduler, start_
                 loss = lamb * criterion(y_pred, y_a) + (1 - lamb) * criterion(y_pred, y_b)
             else:
                 optimizer.zero_grad()
-                y_pred = model(x)
+                y_pred = y_pred_nomix
                 loss = criterion(y_pred, y)
 
         loss.backward()
@@ -121,10 +123,7 @@ def train_per_epoch(model, train_loader, criterion, optimizer, scheduler, start_
 
         # 计算训练loss和acc（每批）
         with torch.no_grad():
-            if mixup_conf['alpha'] == 0:
-                y_ = torch.argmax(y_pred, dim=1)
-            else:
-                y_ = torch.argmax(model(x), dim=1)  # 使用非mixup的数据计算acc
+            y_ = torch.argmax(y_pred_nomix, dim=1)
             correct += (y_ == y).sum().item()
             total += y.size(0)
             sum_loss += loss.item()

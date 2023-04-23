@@ -2,12 +2,14 @@ import torch.optim
 import optim.scheduler
 import torch.nn as nn
 
+'''
 normal_training_config = {
-    'task_name': 'passt_tau2022_random_slicing_augment_mixstyle(alpha=0.3, p=0.6)_noiseoff',   # 任务名，用于模型文件和日志命名
-    'epoch': 250,
+    'task_name': 'ACDNet_random_slicing_augment_mixup(alpha=0.3), mixstyle(alpha=0.3, p=0.8)',   # 任务名，用于模型文件和日志命名
+    'epoch': 500,
+    'start_epoch': 0,
     'criterion': nn.CrossEntropyLoss(),
     'optim_config': {
-        'name': torch.optim.Adam,
+        'name': torch.optim.AdamW,
         'lr': 1e-5,
         'weight_decay': 0.001,
     },
@@ -16,15 +18,16 @@ normal_training_config = {
     },
     'scheduler_warmup_config': {
         'multiplier': 1,
-        'total_epoch': 15,
+        'total_epoch': 20,
     },
-    'model': 'passt',   # 目前可选:cp_resnet, mobileast_s, mobileast_xxs, rfr-cnn, passt, acdnet
+    'model': 'acdnet',   # 目前可选:cp_resnet, mobileast_s, mobileast_xxs, rfr-cnn, passt, acdnet
 }
-
 '''
+
 normal_training_config = {
-    'task_name': 'cp_resnet_tau2022_random_silcing_mixup_mixstyle',   # 任务名，用于模型文件和日志命名
+    'task_name': 'test',  # 任务名，用于模型文件和日志命名
     'epoch': 100,
+    'start_epoch': 0,
     'criterion': nn.CrossEntropyLoss(),
     'optim_config': {
         'name': torch.optim.AdamW,
@@ -38,14 +41,14 @@ normal_training_config = {
         'multiplier': 1,
         'total_epoch': 10,
     },
-    'model': 'cp_resnet',   # 目前可选:cp_resnet, mobileast_s, mobileast_xxs, mobileast_light, rfr-cnn, passt, acdnet
+    'model': 'cp_resnet',  # 目前可选:cp_resnet, mobileast_s, mobileast_xxs, mobileast_light, rfr-cnn, passt, acdnet
 }
-'''
-
 
 distillation_config = {
-    'task_name': 'passt+cp_resnet_tau2022_random_slicing_mixup(alpha=0.3)_mixstyle(alpha=0.3, p=0.8), T=2, soft_loss_alpha=50',   # 任务名，用于模型文件和日志命名
+    'task_name': 'passt+mobileast_light_cpresnet_tau2022_random_slicing_cutmix(alpha=0.3)_mixstyle(alpha=0.3, p=0.8), T=2, soft_loss_alpha=50',
+    # 任务名，用于模型文件和日志命名
     'epoch': 200,
+    'start_epoch': 0,
     'hard_criterion': nn.CrossEntropyLoss(),
     'soft_criterion': nn.KLDivLoss(reduction='batchmean', log_target=False),
     'optim_config': {
@@ -62,7 +65,7 @@ distillation_config = {
     },
     'teacher_model': 'passt',
     'teacher_weight_path': '../model_weights/passt_tau2022_random_slicing_augment_fpatchout=6_mixup(alpha=0.3)_mixstyle(alpha=0.3,p=0.6)_valacc=59.87.pt',
-    'student_model': 'cp_resnet',
-    'T': 2,      # 蒸馏温度
+    'student_model': 'mobileast_light',
+    'T': 2,  # 蒸馏温度
     'alpha': 50  # soft_loss损失系数
 }
