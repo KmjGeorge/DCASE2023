@@ -1,14 +1,12 @@
-import torch.nn as nn
 import torch.nn.functional as F
 import torch
 from torch.optim.lr_scheduler import CosineAnnealingLR
 from optim.scheduler import GradualWarmupScheduler
 from tqdm import tqdm
-from dataset.augmentation import mixup,cutmix
+from dataset.augmentation import mixup, cutmix
 import numpy as np
 from train.normal_train import validate
 import pandas as pd
-from dataset.datagenerator import TAU2022_DEVICES, TAU2022_DEVICES_INVERT
 
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
@@ -29,7 +27,7 @@ def distillation(student, teacher, train_loader, test_loader, start_epoch, disti
 
     optimizer = OPTIM_CONF['name'](student.parameters(), lr=OPTIM_CONF['lr'], weight_decay=OPTIM_CONF['weight_decay'])
     scheduler_cos = CosineAnnealingLR(optimizer,
-                                      T_max=MAX_EPOCH-SCHEDULER_WARMUP_CONFIG['total_epoch'],
+                                      T_max=MAX_EPOCH - SCHEDULER_WARMUP_CONFIG['total_epoch'],
                                       eta_min=SCHEDULER_COS_CONFIG['eta_min'])
     scheduler_warmup = GradualWarmupScheduler(optimizer, multiplier=SCHEDULER_WARMUP_CONFIG['multiplier'],
                                               total_epoch=SCHEDULER_WARMUP_CONFIG['total_epoch'],
@@ -133,7 +131,7 @@ def distillation_per_epoch(student, teacher, train_loader, hard_criterion, soft_
         teacher_pred_softmax = F.softmax(teacher_pred / T, dim=1)
         soft_loss = soft_criterion(y_pred_log_softmax,
                                    teacher_pred_softmax)  # 注意torch的KL散度中，模型预测结果取log_softmax，而教师预测结果取softmax(如果log_target=False)
-        
+
         # 总loss
         loss = hard_loss + alpha * soft_loss
         loss.backward()
@@ -161,53 +159,3 @@ def distillation_per_epoch(student, teacher, train_loader, hard_criterion, soft_
                    "../model_weights/{}_epoch{}.pt".format(save_name, start_epoch + epoch + 1))  # 每轮保存一次参数
 
     return epoch_loss, epoch_acc
-
-
-def validate(model, test_loader, criterion):
-    test_correct = 0
-    test_total = 0
-    test_sum_loss = 0
-    test_device_info = {k: [0, 0, 0.0] for k in TAU2022_DEVICES.keys()}  # key:设备标签 v: [total_num, correct_num, acc]
-
-    model.eval()
-
-    with torch.no_grad():
-        loop = tqdm(test_loader, desc='Validation')
-        for x, y, z in loop:
-            x = x.to(device)
-            y = y.long().to(device)
-            y_pred = model(x)
-            loss = criterion(y_pred, y)
-            y_ = torch.argmax(y_pred, dim=1)
-            test_correct += (y_ == y).sum().item()
-            test_total += y.size(0)
-            test_sum_loss += loss.item()
-            test_running_loss = test_sum_loss / test_total
-            test_running_acc = test_correct / test_total
-
-            # 计算每个设备的准确率
-            for i, source_label in enumerate(z):
-                key = TAU2022_DEVICES_INVERT[int(source_label)]
-                test_device_info[key][0] += 1
-                if (y == y_)[i]:
-                    test_device_info[key][1] += 1
-                test_device_info[key][2] = test_device_info[key][1] / test_device_info[key][0]
-
-            # 输出验证信息
-            loop.set_postfix(val_loss=test_running_loss, val_acc=test_running_acc,
-                             A=test_device_info['a'][2],
-                             B=test_device_info['b'][2],
-                             C=test_device_info['c'][2],
-                             S1=test_device_info['s1'][2],
-                             S2=test_device_info['s2'][2],
-                             S3=test_device_info['s3'][2],
-                             S4=test_device_info['s4'][2],
-                             S5=test_device_info['s5'][2],
-                             S6=test_device_info['s6'][2],
-                             )
-
-    test_epoch_loss = test_sum_loss / test_total
-    test_epoch_acc = test_correct / test_total
-    model.train()
-
-    return test_epoch_loss, test_epoch_acc, test_device_info
