@@ -66,6 +66,9 @@ distillation_config = {
     'teacher_model': 'passt',
     'teacher_weight_path': '../model_weights/passt_tau2022_random_slicing_augment_fpatchout=6_mixup(alpha=0.3)_mixstyle(alpha=0.3,p=0.6)_valacc=59.87.pt',
     'student_model': 'mobileast_light',
-    'T': 2,  # 蒸馏温度
-    'alpha': 50  # soft_loss损失系数
+    'T': 1,  # 蒸馏温度
+    'alpha': 50,  # soft_loss损失系数
+
+    'loss_device_weight': 1
 }
+

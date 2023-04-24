@@ -17,20 +17,26 @@ import train.normal_train
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
 
-def get_model(name):
-    # 频谱特征提取和增强在dataset.spectrum.ExtractMel，作为网络的一个输入层使用
+def get_model(name, wave=True):
+    # wave=True 添加一个频谱特征提取层，使得网络输入可以为波形
     if name == 'cp_resnet':
-        model = nn.Sequential(ExtractMel(**spectrum_config), cp_resnet(mixstyle_conf=mixstyle_config)).to(device)
-    elif name == 'mobileast_s':
-        model = nn.Sequential(ExtractMel(**spectrum_config), mobileast_s(mixstyle_conf=mixstyle_config)).to(device)
-    elif name == 'mobileast_xxs':
-        model = nn.Sequential(ExtractMel(**spectrum_config), mobileast_xxs(mixstyle_conf=mixstyle_config)).to(device)
+        if wave:
+            model = nn.Sequential(ExtractMel(**spectrum_config), cp_resnet(mixstyle_conf=mixstyle_config)).to(device)
+        else:
+            model = cp_resnet(mixstyle_conf=mixstyle_config).to(device)
     elif name == 'mobileast_light':
-        model = nn.Sequential(ExtractMel(**spectrum_config), mobileast_light(mixstyle_conf=mixstyle_config)).to(device)
+        if wave:
+            model = nn.Sequential(ExtractMel(**spectrum_config), mobileast_light(mixstyle_conf=mixstyle_config)).to(
+                device)
+        else:
+            model = mobileast_light(mixstyle_conf=mixstyle_config).to(device)
     elif name == 'rfr-cnn':
-        model = nn.Sequential(ExtractMel(**spectrum_config), RFR_CNN()).to(device)
+        if wave:
+            model = nn.Sequential(ExtractMel(**spectrum_config), RFR_CNN()).to(device)
+        else:
+            model = RFR_CNN().to(device)
     elif name == 'passt':
-        model = passt(mixstyle_conf=mixstyle_config, pretrained_local=True, n_classes=10).to(device)
+        model = passt(mixstyle_conf=mixstyle_config, pretrained_local=False, n_classes=10).to(device)
     elif name == 'acdnet':
         model = GetACDNetModel(mixstyle_conf=mixstyle_config, input_len=32000, nclass=10, sr=spectrum_config['sr'])
     else:
@@ -66,6 +72,7 @@ def setup_seed(seed):
     random.seed(seed)
     torch.backends.cudnn.deterministic = True
 
+
 if __name__ == '__main__':
     '''1. 读取配置'''
     from configs.dataconfig import dataset_config, spectrum_config
@@ -81,8 +88,7 @@ if __name__ == '__main__':
     TASK_NAME = normal_training_config['task_name']
 
     '''2. 获取模型'''
-    # 频谱特征提取和增强在dataset.spectrum.ExtractMel，作为网络的一个输入层使用
-    model = get_model(CHOOSE_MODEL)
+    model = get_model(CHOOSE_MODEL, wave=True)
 
     '''3. 计算模型大小，需指定输入形状 (batch, sr*time) '''
     nessi.get_model_size(model, 'torch', input_size=(1, spectrum_config['sr'] * 1))

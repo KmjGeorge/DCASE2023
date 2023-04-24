@@ -11,19 +11,20 @@ device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
 
 # 定义域对抗训练
-def da_train(model, train_loader, test_loader, start_epoch, normal_training_conf, mixup_conf,
-          save=True):
+def da_train(model, train_loader, test_loader, start_epoch, da_training_conf, mixup_conf,
+             save=True):
     loss_list = []
     acc_list = []
     val_loss_list = []
     val_acc_list = []
 
-    TASK_NAME = normal_training_conf['task_name']
-    MAX_EPOCH = normal_training_conf['epoch']
-    OPTIM_CONF = normal_training_conf['optim_config']
-    SCHEDULER_COS_CONFIG = normal_training_conf['scheduler_cos_config']
-    SCHEDULER_WARMUP_CONFIG = normal_training_conf['scheduler_warmup_config']
-    criterion = normal_training_conf['criterion']
+    TASK_NAME = da_training_conf['task_name']
+    MAX_EPOCH = da_training_conf['epoch']
+    OPTIM_CONF = da_training_conf['optim_config']
+    SCHEDULER_COS_CONFIG = da_training_conf['scheduler_cos_config']
+    SCHEDULER_WARMUP_CONFIG = da_training_conf['scheduler_warmup_config']
+    LOSS_DEVICE_WEIGHT = da_training_conf['loss_device_weight']
+    criterion = da_training_conf['criterion']
 
     # 先逐步增加至初始学习率，然后使用余弦退火
     optimizer = OPTIM_CONF['name'](model.parameters(), lr=OPTIM_CONF['lr'], weight_decay=OPTIM_CONF['weight_decay'])
@@ -47,6 +48,7 @@ def da_train(model, train_loader, test_loader, start_epoch, normal_training_conf
             epochs=MAX_EPOCH,
             save_name=TASK_NAME,
             mixup_conf=mixup_conf,
+            loss_device_weight=LOSS_DEVICE_WEIGHT,
             save=save)
         # 每轮验证一次
         val_epoch_loss, val_epoch_acc, test_device_info = validate(
@@ -79,8 +81,8 @@ def da_train(model, train_loader, test_loader, start_epoch, normal_training_conf
 
 
 def da_train_per_epoch(model, train_loader, criterion, optimizer, scheduler, start_epoch, epoch, epochs, save_name,
-                    mixup_conf, gamma,
-                    save=True):
+                       mixup_conf, loss_device_weight,
+                       save=True):
     correct = 0
     total = 0
     sum_loss = 0.0
@@ -91,30 +93,43 @@ def da_train_per_epoch(model, train_loader, criterion, optimizer, scheduler, sta
     for x, y, z in loop:
         x = x.to(device)
         y = y.long().to(device)
+        z_domain = z.clone()
+        for i in range(len(z)):    # 所有a设备为源域，其他为目标域
+            if z[i] != 0:
+                z_domain[i] = 1
+
         y_pred_nomix, z_pred_nomix = model(x)  # 输出为两个，一个是class标签，一个是设备标签
         if not mixup_conf['enable']:
             optimizer.zero_grad()
             y_pred = y_pred_nomix
             z_pred = z_pred_nomix
             loss_class = criterion(y_pred, y)
-            loss_device = criterion(z_pred, z)
-            loss = loss_class + gamma*loss_device
+            loss_device = criterion(z_pred, z_domain)
+            loss = loss_class + loss_device_weight * loss_device
         else:
             if np.random.rand(1) < mixup_conf['p']:
                 if mixup_conf['cut']:  # 使用cutmix
-                    x_mix, y_a, y_b, lamb = cutmix(x, y, mixup_conf['alpha'])
+                    x_mix, yz_a, yz_b, lamb = cutmix(x, (y,z), mixup_conf['alpha'])
                 else:
-                    x_mix, y_a, y_b, lamb = mixup(x, y, mixup_conf['alpha'])
+                    x_mix, yz_a, yz_b, lamb = mixup(x, (y,z), mixup_conf['alpha'])
                 x_mix = x_mix.to(device)
-                y_a = y_a.to(device)
-                y_b = y_b.to(device)
+                y_a = yz_a[0].to(device)
+                y_b = yz_b[0].to(device)
+                z_a = yz_a[1].to(device)
+                z_b = yz_b[1].to(device)
 
                 optimizer.zero_grad()
                 y_pred, z_pred = model(x_mix)
+                loss_class = lamb * criterion(y_pred, y_a) + (1-lamb) * criterion(y_pred, y_b)
+                loss_device = lamb * criterion(z_pred, z_a) + (1-lamb) * criterion(z_pred, z_b)
+                loss = loss_class + loss_device_weight * loss_device
             else:
                 optimizer.zero_grad()
                 y_pred = y_pred_nomix
-                loss = criterion(y_pred, y)
+                z_pred = z_pred_nomix
+                loss_class = criterion(y_pred, y)
+                loss_device = criterion(z_pred, z_domain)
+                loss = loss_class + loss_device_weight * loss_device
 
         loss.backward()
         optimizer.step()
@@ -139,4 +154,3 @@ def da_train_per_epoch(model, train_loader, criterion, optimizer, scheduler, sta
         torch.save(model.state_dict(),
                    "../model_weights/{}_epoch{}.pt".format(save_name, start_epoch + epoch + 1))  # 每轮保存一次参数
     return epoch_loss, epoch_acc
-

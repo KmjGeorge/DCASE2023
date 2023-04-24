@@ -12,30 +12,7 @@ from model_src.passt import passt
 from model_src.acdnet import GetACDNetModel
 from dataset.spectrum import ExtractMel
 import train.distillation
-
-device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-
-
-def get_model(name):
-    # 频谱特征提取和增强在dataset.spectrum.ExtractMel，作为网络的一个输入层使用
-    if name == 'cp_resnet':
-        model = nn.Sequential(ExtractMel(**spectrum_config), cp_resnet(mixstyle_conf=mixstyle_config)).to(device)
-    elif name == 'mobileast_s':
-        model = nn.Sequential(ExtractMel(**spectrum_config), mobileast_s(mixstyle_conf=mixstyle_config)).to(device)
-    elif name == 'mobileast_xxs':
-        model = nn.Sequential(ExtractMel(**spectrum_config), mobileast_xxs(mixstyle_conf=mixstyle_config)).to(device)
-    elif name == 'mobileast_light':
-        model = nn.Sequential(ExtractMel(**spectrum_config), mobileast_light(mixstyle_conf=mixstyle_config)).to(device)
-    elif name == 'rfr-cnn':
-        model = nn.Sequential(ExtractMel(**spectrum_config), RFR_CNN()).to(device)
-    elif name == 'passt':
-        model = passt(mixstyle_conf=mixstyle_config, pretrained_local=False, n_classes=10).to(device)
-    elif name == 'acdnet':
-        model = GetACDNetModel(mixstyle_conf=mixstyle_config, input_len=32000, nclass=10, sr=spectrum_config['sr'])
-    else:
-        raise '未定义的模型！'
-
-    return model
+from run.run import get_model
 
 
 def show_accloss(loss_list, acc_list, val_loss_list, val_acc_list, save_name):

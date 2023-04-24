@@ -5,6 +5,7 @@ from model_src.module.mixstyle import MixStyle
 from model_src.module.ssn import SubSpecNormalization
 from model_src.module.rfn import RFN
 from torch.quantization import QuantStub, DeQuantStub
+from model_src.module.grl import GRL
 
 device = 'cuda' if torch.cuda.is_available() else 'cpu'
 
@@ -250,7 +251,7 @@ class MobileViTBlock(nn.Module):
         self.transformer = Transformer(dim, depth, 4, 8, mlp_dim, dropout)
 
         self.conv3 = conv_1x1_bn(dim, channel)
-        self.conv4 = conv_nxn_ssn(2 * channel, channel, kernel_size)
+        self.conv4 = conv_nxn_bn(2 * channel, channel, kernel_size)
 
     def forward(self, x):
         y = x.clone()
@@ -571,8 +572,7 @@ class CPBlock(nn.Module):
 
 
 class MobileAST_Light_CPResNet(nn.Module):
-    def __init__(self, spec_size, num_classes, expansion=2, kernel_size=(3, 3), patch_size=(2, 2),
-                 ):
+    def __init__(self, spec_size, num_classes, expansion=2, kernel_size=(3, 3), patch_size=(2, 2), da_train=False):
         super().__init__()
 
         ih, iw = spec_size[0], spec_size[1]
@@ -611,6 +611,28 @@ class MobileAST_Light_CPResNet(nn.Module):
             nn.AdaptiveAvgPool2d((1, 1))
         )
 
+        self.da_train = da_train
+        if self.da_train:
+            self.feed_forward_device = nn.Sequential(
+                GRL(alpha=1),
+                nn.Conv2d(
+                    64,
+                    64,
+                    kernel_size=1,
+                    stride=1,
+                    padding=0,
+                    bias=False),
+                nn.Conv2d(
+                    64,
+                    2,
+                    kernel_size=1,
+                    stride=1,
+                    padding=0,
+                    bias=False),
+                nn.BatchNorm2d(2),
+                nn.AdaptiveAvgPool2d((1, 1))
+            )
+
     def forward(self, x):  # input (1, 1, 128, 64)
         # x = self.quant(x)
         x = self.input_c(x)  # (1, 32, 64, 32)
@@ -622,11 +644,15 @@ class MobileAST_Light_CPResNet(nn.Module):
         # print(x.shape)
         x = self.stage3(x)
         # print(x.shape)
-        x = self.feed_forward(x)
-        # print(x.shape)
-        # x = self.dequant(x)
-        x = x.squeeze(2).squeeze(2)
-        return x
+        x_class = self.feed_forward(x).squeeze(2).squeeze(2)
+        print(x_class.shape)
+        if self.da_train:
+            x_device = self.feed_forward_device(x).squeeze(2).squeeze(2)
+            print(x_device.shape)
+            return x_class, x_device
+        else:
+            return x_class
+
 
 
 def mobilevit_xxs():
@@ -689,7 +715,7 @@ if __name__ == '__main__':
 
     from configs.mixstyle import mixstyle_config
 
-    model = MobileAST_Light_CPResNet((256, 64), num_classes=10, kernel_size=(3, 3), patch_size=(2, 2)).to(device)
+    model = MobileAST_Light_CPResNet((256, 64), num_classes=10, kernel_size=(3, 3), patch_size=(2, 2), da_train=False).to(device)
     # model = mobileast_xxs(mixstyle_conf=mixstyle_config)
     # out = vit(img)
     # print(out.shape)
