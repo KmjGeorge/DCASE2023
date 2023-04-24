@@ -284,19 +284,9 @@ class Network(nn.Module):
                 torch.quantization.fuse_modules(m[1], ['0', '1'], inplace=True)
 
 
-def cp_resnet(mixstyle_conf):
-    rho = 4
-    in_channels = 1
-    arch = "cp_resnet"
-    n_classes = 10
-    base_channels = 32
-    cut_channels_s2 = 0
-    cut_channels_s3 = 0
-    channels_multiplier = 2
-    n_blocks = (2, 2, 2)
-    s1_group = 1
-    s2_group = 1
-    s3_group = 1
+def cp_resnet(mixstyle_conf, rho=4, in_channels=1, arch="cp_resnet", n_classes=10,
+              base_channels=32, cut_channels_s2=0, cut_channels_s3=0, channels_multiplier=2, n_blocks=(2, 2, 2),
+              s1_group=1, s2_group=1, s3_group=1):
 
     extra_kernal_rf = rho - 4
 
@@ -345,7 +335,7 @@ def cp_resnet(mixstyle_conf):
 
 if __name__ == '__main__':
     from configs.mixstyle import mixstyle_config
-    model = cp_resnet(mixstyle_config)
+    model = cp_resnet(mixstyle_config, rho=8, s2_group=2, cut_channels_s3=36)
     from size_cal import nessi
     nessi.get_model_size(model, 'torch', input_size=(1, 1, 256, 44))
     print(model)

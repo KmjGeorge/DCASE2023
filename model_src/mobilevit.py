@@ -71,7 +71,7 @@ class FeedForward(nn.Module):
         super().__init__()
         self.net = nn.Sequential(
             nn.Linear(dim, hidden_dim),
-            nn.SiLU(),
+            nn.SiLU(True),
             nn.Dropout(dropout),
             nn.Linear(hidden_dim, dim),
             nn.Dropout(dropout)
@@ -278,11 +278,11 @@ class MobileASTBlock(nn.Module):
         self.conv1 = conv_nxn_bn(channel, channel, kernal_size=kernel_size)
         self.conv2 = conv_1x1_bn(channel, dim)
 
-        self.transformer = Transformer(dim=dim, depth=depth, heads=2, dim_head=4, mlp_dim=mlp_dim,
+        self.transformer = Transformer(dim=dim, depth=depth, heads=4, dim_head=16, mlp_dim=mlp_dim,
                                        dropout=dropout)
 
         self.conv3 = conv_1x1_bn(dim, channel)
-        self.conv4 = conv_nxn_bn(2 * channel, channel, kernal_size=kernel_size)
+        # self.conv4 = conv_nxn_bn(2 * channel, channel, kernal_size=kernel_size)
 
     def forward(self, x):
         y = x.clone()
@@ -301,7 +301,7 @@ class MobileASTBlock(nn.Module):
         # 特征融合
         x = self.conv3(x)  # (batch_size, d, h, w)
         x = torch.cat((x, y), 1)  # (batch_size, d*2, h, w)
-        x = self.conv4(x)  # (batch_size, d, h, w)
+        # x = self.conv4(x)  # (batch_size, d, h, w)
 
         return x
 
@@ -535,7 +535,7 @@ class CPBlock(nn.Module):
             groups=groups)
 
         self.bn1 = nn.BatchNorm2d(out_channels)
-        self.silu1 = nn.SiLU()
+        self.silu1 = nn.SiLU(True)
         self.conv2 = nn.Conv2d(
             out_channels,
             out_channels,
@@ -559,7 +559,7 @@ class CPBlock(nn.Module):
                     bias=False,
                     groups=groups))
             self.shortcut.add_module('bn', nn.BatchNorm2d(out_channels))  # BN
-        self.silu2 = nn.SiLU()
+        self.silu2 = nn.SiLU(True)
 
     def forward(self, x):
         y = self.silu1(self.bn1(self.conv1(x)))
@@ -581,23 +581,23 @@ class MobileAST_Light_CPResNet(nn.Module):
 
         self.input_c = nn.Sequential(nn.Conv2d(
             in_channels=1,
-            out_channels=16,
+            out_channels=32,
             kernel_size=3,
             stride=2,
             padding=1,
             bias=False),
-            nn.BatchNorm2d(16),
-            nn.SiLU()
+            nn.BatchNorm2d(32),
+            nn.SiLU(True)
         )
 
-        self.stage1 = _make_stage(in_channels=16, out_channels=32, n_blocks=1, block=CPBlock, maxpool=[0, 1],
+        self.stage1 = _make_stage(in_channels=32, out_channels=32, n_blocks=1, block=CPBlock, maxpool=[0, 1],
                                   k1s=[3, 1], k2s=[1, 1], groups=1)
 
         self.mvit_1 = MobileASTBlock(dim=32, depth=8, channel=32, kernel_size=kernel_size, patch_size=patch_size,
                                      mlp_dim=32 * 2)
 
-        self.stage3 = _make_stage(in_channels=32, out_channels=64, n_blocks=1, block=CPBlock, maxpool=[], k1s=[1, 1],
-                                  k2s=[1, 1], groups=1)
+        self.stage3 = _make_stage(in_channels=64, out_channels=64, n_blocks=1, block=CPBlock, maxpool=[], k1s=[1, 1],
+                                  k2s=[1, 1], groups=2)
 
         self.feed_forward = nn.Sequential(
             nn.Conv2d(
@@ -610,8 +610,6 @@ class MobileAST_Light_CPResNet(nn.Module):
             nn.BatchNorm2d(num_classes),
             nn.AdaptiveAvgPool2d((1, 1))
         )
-        self.quant = QuantStub()
-        self.dequant = DeQuantStub()
 
     def forward(self, x):  # input (1, 1, 128, 64)
         # x = self.quant(x)
