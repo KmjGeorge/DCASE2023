@@ -10,7 +10,7 @@ from model_src.module.grl import GRL
 device = 'cuda' if torch.cuda.is_available() else 'cpu'
 
 # 子谱数
-SubSpecNum = 4
+SubSpecNum = 2
 
 layer_index_total = 0
 
@@ -271,6 +271,38 @@ class MobileViTBlock(nn.Module):
         return x
 
 
+class MobileASTBlockv3(nn.Module):
+    def __init__(self, dim, depth, channel, kernel_size, patch_size, mlp_dim, dropout=0.):
+        super().__init__()
+        self.ph, self.pw = patch_size[0], patch_size[1]
+
+        self.depth_conv = nn.Conv2d(channel, channel, kernel_size, groups=channel, padding=1)
+        self.point_conv = nn.Conv2d(channel, dim, kernel_size=1)
+
+        self.transformer = Transformer(dim, depth, 4, 8, mlp_dim, dropout)
+
+        self.conv3 = conv_1x1_bn(dim, channel)
+        self.conv4 = conv_1x1_bn(dim + channel, channel)
+
+    def forward(self, x):
+        y1 = x.clone()
+
+        x = self.point_conv(self.depth_conv(x))
+        y2 = x.clone()
+
+        _, _, h, w = x.shape
+        x = rearrange(x, 'b d (h ph) (w pw) -> b (ph pw) (h w) d', ph=self.ph, pw=self.pw)
+        x = self.transformer(x)
+        x = rearrange(x, 'b (ph pw) (h w) d -> b d (h ph) (w pw)', h=h // self.ph, w=w // self.pw, ph=self.ph,
+                      pw=self.pw)
+
+        x = self.conv3(x)
+        x = torch.cat((x, y2), 1)
+        x = self.conv4(x)
+        x = x + y1
+        return x
+
+
 class MobileASTBlock(nn.Module):
     def __init__(self, dim, depth, channel, kernel_size, patch_size, mlp_dim, dropout=0.):
         super().__init__()
@@ -279,11 +311,11 @@ class MobileASTBlock(nn.Module):
         self.conv1 = conv_nxn_bn(channel, channel, kernal_size=kernel_size)
         self.conv2 = conv_1x1_bn(channel, dim)
 
-        self.transformer = Transformer(dim=dim, depth=depth, heads=4, dim_head=16, mlp_dim=mlp_dim,
+        self.transformer = Transformer(dim=dim, depth=depth, heads=4, dim_head=8, mlp_dim=mlp_dim,
                                        dropout=dropout)
 
         self.conv3 = conv_1x1_bn(dim, channel)
-        # self.conv4 = conv_nxn_bn(2 * channel, channel, kernal_size=kernel_size)
+        self.conv4 = conv_nxn_bn(channel * 2, channel, kernal_size=kernel_size)
 
     def forward(self, x):
         y = x.clone()
@@ -302,7 +334,7 @@ class MobileASTBlock(nn.Module):
         # 特征融合
         x = self.conv3(x)  # (batch_size, d, h, w)
         x = torch.cat((x, y), 1)  # (batch_size, d*2, h, w)
-        # x = self.conv4(x)  # (batch_size, d, h, w)
+        x = self.conv4(x)  # (batch_size, d, h, w)
 
         return x
 
@@ -433,38 +465,32 @@ class MobileAST_Light(nn.Module):
         ph, pw = patch_size[0], patch_size[1]
         assert ih % ph == 0 and iw % pw == 0
 
-        self.conv1 = conv_nxn_ssn(1, 16, stride=2, S=SubSpecNum)
+        self.conv1 = conv_nxn_ssn(1, 32, stride=2, S=SubSpecNum)
 
-        self.mv2_1 = MV2Block_SSN(16, 24, 1, expansion)
-        self.mv2_2 = MV2Block_SSN(24, 32, 2, expansion)
+        self.mv2_1 = MV2Block_SSN(32, 32, 1, expansion=1)
+        self.mv2_2 = MV2Block_SSN(32, 32, 2, expansion=1)
+        self.maxpool1 = nn.MaxPool2d(kernel_size=(2, 1))
+        # self.mv2_3 = MV2Block_SSN(32, 48, 1, expansion=1)
+        # self.mv2_4 = MV2Block_SSN(48, 48, 2, expansion=1)
+        self.mvit_1 = MobileASTBlockv3(64, 6, 32, kernel_size, patch_size, 64 * 2)
 
-        self.mvit_1 = MobileASTBlock(48, 4, 32, kernel_size, patch_size, 96)
+        self.conv2 = conv_1x1_bn(32, 320)
 
-        self.mv2_3 = MV2Block_SSN(32, 64, 2, expansion)
+        self.pool = nn.AvgPool2d((ih // 16, iw // 16), 1)
+        self.fc = nn.Linear(320, num_classes, bias=False)
 
-        self.conv2 = conv_1x1_bn(64, 160)
-
-        self.pool = nn.AvgPool2d((ih // 8, iw // 8), 1)
-        self.fc = nn.Linear(160, num_classes, bias=False)
-
-    def forward(self, x):  # input (1, 1, 128, 64)
-        x = self.conv1(x)  # (1, 16, 64, 32)
-
-        x = self.mv2_1(x)  # (1, 24, 64, 32)
-
-        x = self.mv2_2(x)  # (1, 32, 32, 16)
-
-        x = self.mvit_1(x)  # （1, 48, 32, 16)
-
-        x = self.mv2_3(x)  # (1, 64, 16, 8)
-
-        x = self.conv2(x)  # (1, 160, 16, 8)
-
-        x = self.pool(x)  # (1, 160, 1, 1)
-
-        x = x.view(-1, x.shape[1])  # (1, 160)
-
-        x = self.fc(x)  # (1, 10)
+    def forward(self, x):
+        x = self.conv1(x)
+        x = self.mv2_1(x)
+        x = self.mv2_2(x)
+        x = self.maxpool1(x)
+        # x = self.mv2_3(x)
+        # x = self.mv2_4(x)
+        x = self.mvit_1(x)
+        x = self.conv2(x)
+        x = self.pool(x)
+        x = x.view(-1, x.shape[1])
+        x = self.fc(x)
 
         return x
 
@@ -572,7 +598,7 @@ class CPBlock(nn.Module):
 
 
 class MobileAST_Light_CPResNet(nn.Module):
-    def __init__(self, spec_size, num_classes, expansion=2, kernel_size=(3, 3), patch_size=(2, 2), da_train=False):
+    def __init__(self, spec_size, num_classes, kernel_size=(3, 3), patch_size=(2, 2), da_train=False):
         super().__init__()
 
         ih, iw = spec_size[0], spec_size[1]
@@ -582,22 +608,24 @@ class MobileAST_Light_CPResNet(nn.Module):
         self.input_c = nn.Sequential(nn.Conv2d(
             in_channels=1,
             out_channels=32,
-            kernel_size=3,
+            kernel_size=5,
             stride=2,
-            padding=1,
+            padding=2,
             bias=False),
             nn.BatchNorm2d(32),
             nn.SiLU(True)
         )
 
-        self.stage1 = _make_stage(in_channels=32, out_channels=32, n_blocks=1, block=CPBlock, maxpool=[0, 1],
-                                  k1s=[3, 1], k2s=[1, 1], groups=1)
+        self.stage1 = _make_stage(in_channels=32, out_channels=32, n_blocks=1, block=CPBlock, k1s=[3, 3],
+                                  maxpool=[0, 1],
+                                  groups=2)
 
         self.mvit_1 = MobileASTBlock(dim=32, depth=8, channel=32, kernel_size=kernel_size, patch_size=patch_size,
                                      mlp_dim=32 * 2)
 
-        self.stage3 = _make_stage(in_channels=64, out_channels=64, n_blocks=1, block=CPBlock, maxpool=[], k1s=[1, 1],
-                                  k2s=[1, 1], groups=2)
+        self.stage3 = _make_stage(in_channels=32, out_channels=64, n_blocks=1, block=CPBlock, maxpool=[0, 1],
+                                  k1s=[3, 3],
+                                  groups=4)
 
         self.feed_forward = nn.Sequential(
             nn.Conv2d(
@@ -612,6 +640,7 @@ class MobileAST_Light_CPResNet(nn.Module):
         )
 
         self.da_train = da_train
+
         if self.da_train:
             self.feed_forward_device = nn.Sequential(
                 GRL(alpha=1),
@@ -635,24 +664,22 @@ class MobileAST_Light_CPResNet(nn.Module):
 
     def forward(self, x):  # input (1, 1, 128, 64)
         # x = self.quant(x)
-        x = self.input_c(x)  # (1, 32, 64, 32)
-        # print(x.shape)
+        x = self.input_c(x)
+
         x = self.stage1(x)
-        # print(x.shape)
+
         # x = self.stage2(x)
         x = self.mvit_1(x)
-        # print(x.shape)
+
         x = self.stage3(x)
         # print(x.shape)
         x_class = self.feed_forward(x).squeeze(2).squeeze(2)
-        print(x_class.shape)
+
         if self.da_train:
             x_device = self.feed_forward_device(x).squeeze(2).squeeze(2)
-            print(x_device.shape)
             return x_class, x_device
         else:
             return x_class
-
 
 
 def mobilevit_xxs():
@@ -690,11 +717,10 @@ def mobileast_xxs(mixstyle_conf):
 def mobileast_light(mixstyle_conf):
     if mixstyle_conf['enable']:
         return nn.Sequential(MixStyle(p=mixstyle_conf['p'], alpha=mixstyle_conf['alpha'], freq=mixstyle_conf['freq']),
-                             MobileAST_Light_CPResNet((128, 64), num_classes=10, kernel_size=(3, 3),
-                                                      patch_size=(2, 2)).to(
-                                 device))
+                             MobileAST_Light_CPResNet((256, 64), num_classes=10, kernel_size=(3, 3),
+                                                      patch_size=(2, 2)).to(device))
     else:
-        return MobileAST_Light_CPResNet((128, 64), num_classes=10, kernel_size=(3, 3), patch_size=(2, 2)).to(device)
+        return MobileAST_Light_CPResNet((256, 64), num_classes=10, kernel_size=(3, 3), patch_size=(2, 2)).to(device)
 
 
 def mobileast_s(mixstyle_conf):
@@ -711,11 +737,15 @@ def mobileast_s(mixstyle_conf):
 
 
 if __name__ == '__main__':
-    # img = torch.randn(5, 3, 256, 256).to('cuda')
-
+    from size_cal import nessi
     from configs.mixstyle import mixstyle_config
 
-    model = MobileAST_Light_CPResNet((256, 64), num_classes=10, kernel_size=(3, 3), patch_size=(2, 2), da_train=False).to(device)
+    model = mobileast_light(mixstyle_config)
+    mobileast_light = MobileAST_Light(spec_size=(256, 64), num_classes=10, kernel_size=(3, 3), patch_size=(2, 2))
+    blockv1 = MobileASTBlock(dim=32, depth=8, channel=32, kernel_size=(3, 3), patch_size=(2, 2), mlp_dim=32 * 2)
+    blockv3 = MobileASTBlockv3(dim=32, depth=8, channel=32, kernel_size=(3, 3), patch_size=(2, 2), mlp_dim=32 * 2)
+    # nessi.get_model_size(blockv1, 'torch', (1, 32, 32, 16))
+    # nessi.get_model_size(blockv3, 'torch', (1, 32, 32, 16))
     # model = mobileast_xxs(mixstyle_conf=mixstyle_config)
     # out = vit(img)
     # print(out.shape)
@@ -724,7 +754,11 @@ if __name__ == '__main__':
     # summary(vit, input_size=(3, 256, 256))
 
     # 评估模型参数量和MACC
-    from size_cal import nessi
 
-    nessi.get_model_size(model, 'torch', input_size=(1, 1, 256, 64))
-    print(model)
+    # nessi.get_model_size(model, 'torch', (1, 1, 256, 64))
+    nessi.get_model_size(mobileast_light, 'torch', (1, 1, 256, 64))
+    # nessi.get_model_size(model, 'torch', (1, 1, 256, 64))
+
+    # nessi.get_model_size(stage1, 'torch', (1, 24, 128, 32))
+    # nessi.get_model_size(mobileastblock, 'torch', input_size=(1, 64, 64, 32))
+    # nessi.get_model_size(model, 'torch', input_size=(1, 1, 128, 64))

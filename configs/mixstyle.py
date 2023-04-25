@@ -1,6 +1,6 @@
 mixstyle_config = {
-    'enable': True,
+    'enable': False,
     'alpha': 0.3,
-    'p': 0.8,
+    'p': 0.6,
     'freq': True
 }

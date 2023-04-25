@@ -2,46 +2,25 @@ import torch.optim
 import optim.scheduler
 import torch.nn as nn
 
-'''
 normal_training_config = {
-    'task_name': 'ACDNet_random_slicing_augment_mixup(alpha=0.3), mixstyle(alpha=0.3, p=0.8)',   # 任务名，用于模型文件和日志命名
-    'epoch': 500,
+    'task_name': 'mobileast_cpresnet',  # 任务名，用于模型文件和日志命名
+    'epoch': 200,
     'start_epoch': 0,
     'criterion': nn.CrossEntropyLoss(),
     'optim_config': {
-        'name': torch.optim.AdamW,
-        'lr': 1e-5,
-        'weight_decay': 0.001,
-    },
-    'scheduler_cos_config': {
-        'eta_min': 1e-7
-    },
-    'scheduler_warmup_config': {
-        'multiplier': 1,
-        'total_epoch': 20,
-    },
-    'model': 'acdnet',   # 目前可选:cp_resnet, mobileast_s, mobileast_xxs, rfr-cnn, passt, acdnet
-}
-'''
-
-normal_training_config = {
-    'task_name': 'test',  # 任务名，用于模型文件和日志命名
-    'epoch': 100,
-    'start_epoch': 0,
-    'criterion': nn.CrossEntropyLoss(),
-    'optim_config': {
-        'name': torch.optim.AdamW,
+        'name': torch.optim.Adam,
         'lr': 1e-3,
-        'weight_decay': 0.01,
-    },
-    'scheduler_cos_config': {
-        'eta_min': 1e-5
+        'weight_decay': 0.001,
     },
     'scheduler_warmup_config': {
         'multiplier': 1,
         'total_epoch': 10,
     },
-    'model': 'cp_resnet',  # 目前可选:cp_resnet, mobileast_s, mobileast_xxs, mobileast_light, rfr-cnn, passt, acdnet
+    'scheduler_down_config': {
+        'total_epoch': 100,
+        'eta_min': 5e-3,
+    },
+    'model': 'mobileast_light',  # 目前可选:cp_resnet, mobileast_s, mobileast_xxs, mobileast_light, rfr-cnn, passt, acdnet
 }
 
 distillation_config = {

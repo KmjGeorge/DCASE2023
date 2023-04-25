@@ -58,25 +58,9 @@ if __name__ == '__main__':
                              's4': [],
                              's5': [],
                              's6': []}
-    for i in range(289):
-        weights = torch.load(
-        '../model_weights/alter_passt+cp_resnet_tau2022_random_slicing_mixup(alpha=0.3)_mixstyle(alpha=0.3, p=0.8), T=2, soft_loss_alpha=50_epoch{}.pt'.format(i+1))
-        model.load_state_dict(weights)
-        val_loss, val_acc, test_device_info = validate(model, test_dataloader, criterion=normal_training_config['criterion'])
-        val_loss_list.append(val_loss)
-        val_acc_list.append(val_acc)
-        for key in test_device_acc_total.keys():
-            test_device_acc_total[key].append(test_device_info[key][2])
-    logs = pd.DataFrame({'val_loss': val_loss_list,
-                         'val_acc': val_acc_list,
-                         'val_A_acc': test_device_acc_total['a'],
-                         'val_B_acc': test_device_acc_total['b'],
-                         'val_C_acc': test_device_acc_total['c'],
-                         'val_S1_acc': test_device_acc_total['s1'],
-                         'val_S2_acc': test_device_acc_total['s2'],
-                         'val_S3_acc': test_device_acc_total['s3'],
-                         'val_S4_acc': test_device_acc_total['s4'],
-                         'val_S5_acc': test_device_acc_total['s5'],
-                         'val_S6_acc': test_device_acc_total['s6'],
-                         })
-    logs.to_csv('../logs/alter_passt+cp_resnet_tau2022_random_slicing_mixup(alpha=0.3)_mixstyle(alpha=0.3, p=0.8), T=2, soft_loss_alpha=50_logs.csv', index=True)
+
+    weights = torch.load(
+    '../model_weights/cp_resnet_mixstyle_mixup_augment_tau2022_epoch17.pt')
+    model.load_state_dict(weights)
+    val_loss, val_acc, test_device_info = validate(model, test_dataloader, criterion=normal_training_config['criterion'])
+

@@ -287,7 +287,6 @@ class Network(nn.Module):
 def cp_resnet(mixstyle_conf, rho=4, in_channels=1, arch="cp_resnet", n_classes=10,
               base_channels=32, cut_channels_s2=0, cut_channels_s3=0, channels_multiplier=2, n_blocks=(2, 2, 2),
               s1_group=1, s2_group=1, s3_group=1):
-
     extra_kernal_rf = rho - 4
 
     model_config = {
@@ -328,14 +327,17 @@ def cp_resnet(mixstyle_conf, rho=4, in_channels=1, arch="cp_resnet", n_classes=1
 
     from model_src.module.mixstyle import MixStyle
     if mixstyle_conf['enable']:
-        return nn.Sequential(MixStyle(p=mixstyle_conf['p'], alpha=mixstyle_conf['alpha'], freq=mixstyle_conf['freq']), Network(model_config))
+        return nn.Sequential(MixStyle(p=mixstyle_conf['p'], alpha=mixstyle_conf['alpha'], freq=mixstyle_conf['freq']),
+                             Network(model_config))
     else:
         return Network(model_config)
 
 
 if __name__ == '__main__':
     from configs.mixstyle import mixstyle_config
-    model = cp_resnet(mixstyle_config, rho=8, s2_group=2, cut_channels_s3=36)
+
+    model = cp_resnet(mixstyle_config, rho=7, s1_group=1, s2_group=2, cut_channels_s2=6, s3_group=1, cut_channels_s3=32)
     from size_cal import nessi
+
     nessi.get_model_size(model, 'torch', input_size=(1, 1, 256, 44))
     print(model)

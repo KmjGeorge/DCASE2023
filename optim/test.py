@@ -3,10 +3,10 @@ from torch.optim.lr_scheduler import StepLR, CosineAnnealingLR
 from torch.optim import AdamW
 from torch.optim.sgd import SGD
 import matplotlib.pyplot as plt
-from scheduler import GradualWarmupScheduler
+from scheduler import GradualWarmupScheduler, ExpWarmupLinearDownScheduler
 from model_src.rfr_cnn import RFR_CNN
 
-MAX_EPOCH = 100
+MAX_EPOCH = 200
 BATCH_SIZE = 32
 if __name__ == '__main__':
 
@@ -20,8 +20,10 @@ if __name__ == '__main__':
     # scheduler_steplr = StepLR(optimizer, step_size=5, gamma=0.1)
 
     # 先逐步增加至初始学习率，然后使用余弦退火
-    scheduler_cos = CosineAnnealingLR(optimizer, T_max=MAX_EPOCH-10, eta_min=1e-5)
-    scheduler_warmup = GradualWarmupScheduler(optimizer, multiplier=1, total_epoch=10, after_scheduler=scheduler_cos)
+    # scheduler_cos = CosineAnnealingLR(optimizer, T_max=MAX_EPOCH-10, eta_min=1e-5)
+    # scheduler_warmup = GradualWarmupScheduler(optimizer, multiplier=1, total_epoch=10, after_scheduler=scheduler_cos)
+    scheduler_exp_warmup_linear_down = ExpWarmupLinearDownScheduler(optimizer, warm_up_len=50, ramp_down_start=50,
+                                                                    ramp_down_len=100, last_lr_value=5e-3)
     # optimizer.zero_grad()
     # optimizer.step()
     lr_list = []
@@ -29,7 +31,7 @@ if __name__ == '__main__':
         for batch in range(BATCH_SIZE):
             optimizer.zero_grad()
             optimizer.step()
-        scheduler_warmup.step()
+        scheduler_exp_warmup_linear_down.step()
         cur_lr = optimizer.param_groups[0]['lr']
         lr_list.append(cur_lr)
         print(epoch + 1, cur_lr)

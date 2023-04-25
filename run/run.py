@@ -21,7 +21,7 @@ def get_model(name, wave=True):
     # wave=True 添加一个频谱特征提取层，使得网络输入可以为波形
     if name == 'cp_resnet':
         if wave:
-            model = nn.Sequential(ExtractMel(**spectrum_config), cp_resnet(mixstyle_conf=mixstyle_config)).to(device)
+            model = nn.Sequential(ExtractMel(**spectrum_config), cp_resnet(mixstyle_conf=mixstyle_config, rho=7, s1_group=1, s2_group=2, cut_channels_s2=6, s3_group=1, cut_channels_s3=32)).to(device)
         else:
             model = cp_resnet(mixstyle_conf=mixstyle_config).to(device)
     elif name == 'mobileast_light':
