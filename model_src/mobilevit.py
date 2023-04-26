@@ -467,17 +467,17 @@ class MobileAST_Light(nn.Module):
 
         self.conv1 = conv_nxn_ssn(1, 32, stride=2, S=SubSpecNum)
 
-        self.mv2_1 = MV2Block_SSN(32, 32, 1, expansion=1)
-        self.mv2_2 = MV2Block_SSN(32, 32, 2, expansion=1)
+        self.mv2_1 = MV2Block(32, 48, 1, expansion=1)
+        self.mv2_2 = MV2Block(48, 48, 2, expansion=1)
         self.maxpool1 = nn.MaxPool2d(kernel_size=(2, 1))
         # self.mv2_3 = MV2Block_SSN(32, 48, 1, expansion=1)
         # self.mv2_4 = MV2Block_SSN(48, 48, 2, expansion=1)
-        self.mvit_1 = MobileASTBlockv3(64, 6, 32, kernel_size, patch_size, 64 * 2)
+        self.mvit_1 = MobileASTBlockv3(48, 6, 48, kernel_size, patch_size, 48 * 2)
 
-        self.conv2 = conv_1x1_bn(32, 320)
+        self.conv2 = conv_1x1_bn(48, 300)
 
-        self.pool = nn.AvgPool2d((ih // 16, iw // 16), 1)
-        self.fc = nn.Linear(320, num_classes, bias=False)
+        self.pool = nn.AvgPool2d((ih // 8, iw // 4), 1)
+        self.fc = nn.Linear(300, num_classes, bias=False)
 
     def forward(self, x):
         x = self.conv1(x)
@@ -487,6 +487,49 @@ class MobileAST_Light(nn.Module):
         # x = self.mv2_3(x)
         # x = self.mv2_4(x)
         x = self.mvit_1(x)
+        x = self.conv2(x)
+        x = self.pool(x)
+        x = x.view(-1, x.shape[1])
+        x = self.fc(x)
+
+        return x
+
+
+class MobileAST_Light2(nn.Module):
+    def __init__(self, spec_size, num_classes, kernel_size=(3, 3), patch_size=(2, 2),
+                 ):
+        super().__init__()
+
+        ih, iw = spec_size[0], spec_size[1]
+        ph, pw = patch_size[0], patch_size[1]
+        assert ih % ph == 0 and iw % pw == 0
+
+        self.conv1 = conv_nxn_bn(1, 32, stride=2)
+
+        self.mv2_1 = MV2Block(32, 32, 1, expansion=2)
+        self.mv2_2 = MV2Block(32, 32, 2, expansion=1)
+        self.fmaxpool = nn.MaxPool2d(kernel_size=(2, 1))
+        self.mvit_1 = MobileASTBlockv3(32, 2, 32, kernel_size, patch_size, 32 * 2)
+        self.mv2_4 = MV2Block(32, 64, 2, expansion=2)
+        self.mvit_2 = MobileASTBlockv3(48, 4, 64, kernel_size, patch_size, 48 * 2)
+
+        self.conv2 = conv_1x1_bn(64, 200)
+
+        self.pool = nn.AvgPool2d((16, 8), 1)
+        self.fc = nn.Linear(200, num_classes, bias=False)
+
+    def forward(self, x):
+        x = self.conv1(x)
+        x = self.mv2_1(x)
+        x = self.mv2_2(x)
+        x = self.fmaxpool(x)
+        # x = self.maxpool1(x)
+        # x = self.mv2_3(x)
+        # x = self.mv2_4(x)
+        x = self.mvit_1(x)
+        # x = self.mv2_3(x)
+        x = self.mv2_4(x)
+        x = self.mvit_2(x)
         x = self.conv2(x)
         x = self.pool(x)
         x = x.view(-1, x.shape[1])
@@ -740,8 +783,8 @@ if __name__ == '__main__':
     from size_cal import nessi
     from configs.mixstyle import mixstyle_config
 
-    model = mobileast_light(mixstyle_config)
-    mobileast_light = MobileAST_Light(spec_size=(256, 64), num_classes=10, kernel_size=(3, 3), patch_size=(2, 2))
+    # model = mobileast_light(mixstyle_config)
+    mobileast_light2 = MobileAST_Light2(spec_size=(256, 64), num_classes=10, kernel_size=(3, 3), patch_size=(2, 2))
     blockv1 = MobileASTBlock(dim=32, depth=8, channel=32, kernel_size=(3, 3), patch_size=(2, 2), mlp_dim=32 * 2)
     blockv3 = MobileASTBlockv3(dim=32, depth=8, channel=32, kernel_size=(3, 3), patch_size=(2, 2), mlp_dim=32 * 2)
     # nessi.get_model_size(blockv1, 'torch', (1, 32, 32, 16))
@@ -756,9 +799,8 @@ if __name__ == '__main__':
     # 评估模型参数量和MACC
 
     # nessi.get_model_size(model, 'torch', (1, 1, 256, 64))
-    nessi.get_model_size(mobileast_light, 'torch', (1, 1, 256, 64))
-    # nessi.get_model_size(model, 'torch', (1, 1, 256, 64))
-
+    nessi.get_model_size(mobileast_light2, 'torch', (1, 1, 256, 64))
+    print(mobileast_light2)
     # nessi.get_model_size(stage1, 'torch', (1, 24, 128, 32))
     # nessi.get_model_size(mobileastblock, 'torch', input_size=(1, 64, 64, 32))
     # nessi.get_model_size(model, 'torch', input_size=(1, 1, 128, 64))

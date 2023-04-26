@@ -39,6 +39,15 @@ def distillation(student, teacher, train_loader, test_loader, distillation_conf,
     acc_list = []
     val_loss_list = []
     val_acc_list = []
+    test_device_info_list_a = []
+    test_device_info_list_b = []
+    test_device_info_list_c = []
+    test_device_info_list_s1 = []
+    test_device_info_list_s2 = []
+    test_device_info_list_s3 = []
+    test_device_info_list_s4 = []
+    test_device_info_list_s5 = []
+    test_device_info_list_s6 = []
 
     for i in range(MAX_EPOCH):
         epoch_loss, epoch_acc = distillation_per_epoch(
@@ -67,22 +76,22 @@ def distillation(student, teacher, train_loader, test_loader, distillation_conf,
         acc_list.append(epoch_acc)
         val_loss_list.append(val_epoch_loss)
         val_acc_list.append(val_epoch_acc)
+
         if save:  # 保存训练日志
             logs = pd.DataFrame({'loss': loss_list,
                                  'acc': acc_list,
                                  'val_loss': val_loss_list,
                                  'val_acc': val_acc_list,
-                                 'a_acc': test_device_info['a'][2],
-                                 'b_acc': test_device_info['b'][2],
-                                 'c_acc': test_device_info['c'][2],
-                                 's1_acc': test_device_info['s1'][2],
-                                 's2_acc': test_device_info['s2'][2],
-                                 's3_acc': test_device_info['s3'][2],
-                                 's4_acc': test_device_info['s4'][2],
-                                 's5_acc': test_device_info['s5'][2],
-                                 's6_acc': test_device_info['s6'][2],
-                                 }
-                                )
+                                 'val_A_acc': test_device_info_list_a,
+                                 'val_B_acc': test_device_info_list_b,
+                                 'val_C_acc': test_device_info_list_c,
+                                 'val_S1_acc': test_device_info_list_s1,
+                                 'val_S2_acc': test_device_info_list_s2,
+                                 'val_S3_acc': test_device_info_list_s3,
+                                 'val_S4_acc': test_device_info_list_s4,
+                                 'val_S5_acc': test_device_info_list_s5,
+                                 'val_S6_acc': test_device_info_list_s6,
+                                 })
             logs.to_csv('../logs/{}_logs.csv'.format(TASK_NAME), index=True)
     print('==========Finished Training===========')
 
