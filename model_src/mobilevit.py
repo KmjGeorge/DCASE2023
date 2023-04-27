@@ -659,16 +659,20 @@ class MobileAST_Light_CPResNet(nn.Module):
             nn.SiLU(True)
         )
 
-        self.stage1 = _make_stage(in_channels=32, out_channels=32, n_blocks=1, block=CPBlock, k1s=[3, 3],
-                                  maxpool=[0, 1],
-                                  groups=2)
+        self.stage1 = _make_stage(in_channels=32, out_channels=32, n_blocks=1, block=CPBlock, k1s=[3, 1], k2s=[3, 1],
+                                  maxpool=[0, 1], groups=1)
 
-        self.mvit_1 = MobileASTBlock(dim=32, depth=8, channel=32, kernel_size=kernel_size, patch_size=patch_size,
-                                     mlp_dim=32 * 2)
+        self.mvit_1 = MobileASTBlockv3(dim=32, depth=2, channel=32, kernel_size=kernel_size, patch_size=patch_size,
+                                       mlp_dim=32 * 2)
 
-        self.stage3 = _make_stage(in_channels=32, out_channels=64, n_blocks=1, block=CPBlock, maxpool=[0, 1],
-                                  k1s=[3, 3],
-                                  groups=4)
+        self.conv = conv_nxn_bn(32, 64, kernal_size=3, stride=2)
+
+        self.mvit_2 = MobileASTBlockv3(dim=32, depth=4, channel=64, kernel_size=kernel_size, patch_size=patch_size,
+                                       mlp_dim=32 * 2)
+
+        self.stage3 = _make_stage(in_channels=64, out_channels=64, n_blocks=1, block=CPBlock, maxpool=[],
+                                  k1s=[1, 1], k2s=[1, 1],
+                                  groups=1)
 
         self.feed_forward = nn.Sequential(
             nn.Conv2d(
@@ -708,12 +712,10 @@ class MobileAST_Light_CPResNet(nn.Module):
     def forward(self, x):  # input (1, 1, 128, 64)
         # x = self.quant(x)
         x = self.input_c(x)
-
         x = self.stage1(x)
-
-        # x = self.stage2(x)
         x = self.mvit_1(x)
-
+        x = self.conv(x)
+        x = self.mvit_2(x)
         x = self.stage3(x)
         # print(x.shape)
         x_class = self.feed_forward(x).squeeze(2).squeeze(2)
@@ -760,6 +762,15 @@ def mobileast_xxs(mixstyle_conf):
 def mobileast_light(mixstyle_conf):
     if mixstyle_conf['enable']:
         return nn.Sequential(MixStyle(p=mixstyle_conf['p'], alpha=mixstyle_conf['alpha'], freq=mixstyle_conf['freq']),
+                             MobileAST_Light((256, 64), num_classes=10, kernel_size=(3, 3),
+                                             patch_size=(2, 2)).to(device))
+    else:
+        return MobileAST_Light((256, 64), num_classes=10, kernel_size=(3, 3), patch_size=(2, 2)).to(device)
+
+
+def mobileast_cpresnet(mixstyle_conf):
+    if mixstyle_conf['enable']:
+        return nn.Sequential(MixStyle(p=mixstyle_conf['p'], alpha=mixstyle_conf['alpha'], freq=mixstyle_conf['freq']),
                              MobileAST_Light_CPResNet((256, 64), num_classes=10, kernel_size=(3, 3),
                                                       patch_size=(2, 2)).to(device))
     else:
@@ -783,8 +794,8 @@ if __name__ == '__main__':
     from size_cal import nessi
     from configs.mixstyle import mixstyle_config
 
-    # model = mobileast_light(mixstyle_config)
-    mobileast_light2 = MobileAST_Light2(spec_size=(256, 64), num_classes=10, kernel_size=(3, 3), patch_size=(2, 2))
+    mobileastv3_cpresnet = mobileast_light(mixstyle_config)
+    # mobileast_light2 = MobileAST_Light2(spec_size=(256, 64), num_classes=10, kernel_size=(3, 3), patch_size=(2, 2))
     blockv1 = MobileASTBlock(dim=32, depth=8, channel=32, kernel_size=(3, 3), patch_size=(2, 2), mlp_dim=32 * 2)
     blockv3 = MobileASTBlockv3(dim=32, depth=8, channel=32, kernel_size=(3, 3), patch_size=(2, 2), mlp_dim=32 * 2)
     # nessi.get_model_size(blockv1, 'torch', (1, 32, 32, 16))
@@ -799,8 +810,8 @@ if __name__ == '__main__':
     # 评估模型参数量和MACC
 
     # nessi.get_model_size(model, 'torch', (1, 1, 256, 64))
-    nessi.get_model_size(mobileast_light2, 'torch', (1, 1, 256, 64))
-    print(mobileast_light2)
+    nessi.get_model_size(mobileastv3_cpresnet, 'torch', (1, 1, 256, 64))
+    print(mobileastv3_cpresnet)
     # nessi.get_model_size(stage1, 'torch', (1, 24, 128, 32))
     # nessi.get_model_size(mobileastblock, 'torch', input_size=(1, 64, 64, 32))
     # nessi.get_model_size(model, 'torch', input_size=(1, 1, 128, 64))

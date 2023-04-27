@@ -5,15 +5,11 @@ import torch.nn as nn
 import random
 import numpy as np
 from size_cal import nessi
-from model_src.mobilevit import mobileast_xxs, mobileast_s, mobileast_light
-from model_src.rfr_cnn import RFR_CNN
-from model_src.cp_resnet import cp_resnet
-from model_src.passt import passt
-from model_src.acdnet import GetACDNetModel
+from run.run import get_model
 from dataset.spectrum import ExtractMel
 import train.distillation
-from run.run import get_model
 
+device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
 def show_accloss(loss_list, acc_list, val_loss_list, val_acc_list, save_name):
     x = [i + 1 for i in range(len(loss_list))]

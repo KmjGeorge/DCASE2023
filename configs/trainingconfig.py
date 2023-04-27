@@ -3,8 +3,8 @@ import optim.scheduler
 import torch.nn as nn
 
 normal_training_config = {
-    'task_name': 'mobileast_cpresnet',  # 任务名，用于模型文件和日志命名
-    'epoch': 200,
+    'task_name': 'cp_resnet rho=7 g2=2 cut2=4 cut3=36',  # 任务名，用于模型文件和日志命名
+    'epoch': 300,
     'start_epoch': 0,
     'criterion': nn.CrossEntropyLoss(),
     'optim_config': {
@@ -14,13 +14,13 @@ normal_training_config = {
     },
     'scheduler_warmup_config': {
         'multiplier': 1,
-        'total_epoch': 10,
+        'total_epoch': 50,
     },
     'scheduler_down_config': {
-        'total_epoch': 100,
+        'total_epoch': 150,
         'eta_min': 5e-3,
     },
-    'model': 'mobileast_light',  # 目前可选:cp_resnet, mobileast_s, mobileast_xxs, mobileast_light, rfr-cnn, passt, acdnet
+    'model': 'cp_resnet',  # 目前可选:cp_resnet, mobileast_s, mobileast_xxs, mobileast_light, rfr-cnn, passt, acdnet
 }
 
 distillation_config = {
