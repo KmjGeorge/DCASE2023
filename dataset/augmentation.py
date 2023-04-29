@@ -2,6 +2,7 @@ import random
 
 import torch
 import numpy as np
+import torchaudio
 
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
@@ -31,6 +32,7 @@ def gauss_noise(batch_audio, snr):
     return noise_batch
 
 
+# cutmix
 def cutmix(data, target, alpha):
     """
     CutMix augmentation implementation.
@@ -79,6 +81,20 @@ def rand_bbox(size, lam):
     bby2 = np.clip(cy + cut_h // 2, 0, H)
 
     return bbx1, bby1, bbx2, bby2
+
+
+# 将波形沿时间轴随机滚动
+def timerolling(x, axis=2, shift=50):
+    sf = int(np.random.random_integers(-shift, shift))
+    return x.roll(sf, axis)
+
+
+def spectrumaugment(mel, freqm, timem):
+    freqmask = torchaudio.transforms.FrequencyMasking(freqm, iid_masks=True)
+    timemask = torchaudio.transforms.TimeMasking(timem, iid_masks=True)
+    mel = freqmask(mel)
+    mel = timemask(mel)
+    return mel
 
 
 if __name__ == '__main__':
