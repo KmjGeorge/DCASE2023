@@ -6,8 +6,7 @@ import pandas as pd
 import random
 import numpy as np
 from size_cal import nessi
-from model_src.mobilevit import mobileast_xxs, mobileast_s, mobileast_light, mobileast_cpresnet
-from model_src.rfr_cnn import RFR_CNN
+from model_src.mobilevit import mobileast_light, mobileast_cpresnet2, mobileast_light2, mobileast_cpresnet
 from model_src.cp_resnet import cp_resnet
 from model_src.passt import passt
 from model_src.acdnet import GetACDNetModel
@@ -22,27 +21,33 @@ def get_model(name, wave=True):
     if name == 'cp_resnet':
         if wave:
             model = nn.Sequential(ExtractMel(**spectrum_config),
-                                  cp_resnet(mixstyle_conf=mixstyle_config, rho=7, s1_group=1, s2_group=2,
-                                            cut_channels_s2=6, s3_group=1, cut_channels_s3=32)).to(device)
+                                  cp_resnet(mixstyle_config, rho=8, s2_group=2, cut_channels_s3=36, n_blocks=(2, 1, 1))).to(device)
         else:
-            model = cp_resnet(mixstyle_config, rho=7, s1_group=1, s2_group=2, s3_group=1, cut_channels_s2=4, cut_channels_s3=36).to(device)
+            model = cp_resnet(mixstyle_config, rho=8, s2_group=2, cut_channels_s3=36, n_blocks=(2, 1, 1)).to(device)
     elif name == 'mobileast_light':
         if wave:
             model = nn.Sequential(ExtractMel(**spectrum_config), mobileast_light(mixstyle_conf=mixstyle_config)).to(
                device)
         else:
             model = mobileast_light(mixstyle_conf=mixstyle_config).to(device)
+    elif name == 'mobileast_light2':
+        if wave:
+            model = nn.Sequential(ExtractMel(**spectrum_config), mobileast_light2(mixstyle_conf=mixstyle_config)).to(
+               device)
+        else:
+            model = mobileast_light2(mixstyle_conf=mixstyle_config).to(device)
     elif name == 'mobileast_cpresnet':
         if wave:
             model = nn.Sequential(ExtractMel(**spectrum_config), mobileast_cpresnet(mixstyle_conf=mixstyle_config)).to(
                device)
         else:
             model = mobileast_cpresnet(mixstyle_conf=mixstyle_config).to(device)
-    elif name == 'rfr-cnn':
+    elif name == 'mobileast_cpresnet2':
         if wave:
-            model = nn.Sequential(ExtractMel(**spectrum_config), RFR_CNN()).to(device)
+            model = nn.Sequential(ExtractMel(**spectrum_config), mobileast_cpresnet2(mixstyle_conf=mixstyle_config)).to(
+               device)
         else:
-            model = RFR_CNN().to(device)
+            model = mobileast_cpresnet2(mixstyle_conf=mixstyle_config).to(device)
     elif name == 'passt':
         model = passt(mixstyle_conf=mixstyle_config, pretrained_local=False, n_classes=10).to(device)
     elif name == 'acdnet':

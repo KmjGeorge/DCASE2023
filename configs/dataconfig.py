@@ -2,7 +2,7 @@ spectrum_config = {
     'sr': 32000,
     'n_fft': 2048,
     'win_length': 2000,
-    'hop_length': 500,
+    'hop_length': 500,   # 744
     'n_mels': 256,
     'freqm': 0,  # specaugment 频率掩膜
     'timem': 0,  # specaugment 时间掩膜
@@ -11,6 +11,7 @@ spectrum_config = {
     'fmin_aug_range': 1,  # mel滤波器频率随机偏移范围 最小值
     'fmax_aug_range': 1  # mel滤波器频率随机偏移范围 最大值
 }
+
 '''
 dataset_config = {
     'name': 'tau2022',

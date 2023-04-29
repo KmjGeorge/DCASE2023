@@ -4,12 +4,51 @@ import matplotlib.pyplot as plt
 import torch.nn as nn
 import random
 import numpy as np
+
+from model_src.cp_resnet import cp_resnet
+from model_src.mobilevit import mobileast_light2, mobileast_light, mobileast_cpresnet2
+from model_src.passt import passt
 from size_cal import nessi
-from run.run import get_model
 from dataset.spectrum import ExtractMel
 import train.distillation
 
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+
+
+def get_model(name, wave=True):
+    # wave=True 添加一个频谱特征提取层，使得网络输入可以为波形
+    if name == 'cp_resnet':
+        if wave:
+            model = nn.Sequential(ExtractMel(**spectrum_config),
+                                  cp_resnet(mixstyle_config, rho=8, s2_group=2, cut_channels_s3=36,
+                                            n_blocks=(2, 1, 1))).to(device)
+        else:
+            model = cp_resnet(mixstyle_config, rho=8, s2_group=2, cut_channels_s3=36, n_blocks=(2, 1, 1)).to(device)
+    elif name == 'mobileast_light':
+        if wave:
+            model = nn.Sequential(ExtractMel(**spectrum_config), mobileast_light(mixstyle_conf=mixstyle_config)).to(
+                device)
+        else:
+            model = mobileast_light(mixstyle_conf=mixstyle_config).to(device)
+    elif name == 'mobileast_light2':
+        if wave:
+            model = nn.Sequential(ExtractMel(**spectrum_config), mobileast_light2(mixstyle_conf=mixstyle_config)).to(
+                device)
+        else:
+            model = mobileast_light2(mixstyle_conf=mixstyle_config).to(device)
+    elif name == 'mobileast_cpresnet':
+        if wave:
+            model = nn.Sequential(ExtractMel(**spectrum_config), mobileast_cpresnet2(mixstyle_conf=mixstyle_config)).to(
+                device)
+        else:
+            model = mobileast_cpresnet2(mixstyle_conf=mixstyle_config).to(device)
+    elif name == 'passt':
+        model = passt(mixstyle_conf=mixstyle_config, pretrained_local=False, n_classes=10).to(device)
+    else:
+        raise '未定义的模型！'
+
+    return model
+
 
 def show_accloss(loss_list, acc_list, val_loss_list, val_acc_list, save_name):
     x = [i + 1 for i in range(len(loss_list))]
@@ -58,7 +97,11 @@ if __name__ == '__main__':
     '''2. 获取模型'''
     teacher = get_model(TEACHER_MODEL)
     student = get_model(STUDENT_MODEL)
-    teacher.load_state_dict(torch.load(TEACHER_WEIGHT_PATH))
+    weights = torch.load(TEACHER_WEIGHT_PATH)
+    # weights_new = {}
+    # for k, v in weights.items():
+    #     weights_new[k.replace('net.1.', 'net.')] = v
+    teacher.load_state_dict(weights)
 
     '''3. 计算模型大小，需指定输入形状 (batch, sr*time) '''
     nessi.get_model_size(teacher, 'torch', input_size=(1, spectrum_config['sr'] * 1))

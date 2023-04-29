@@ -431,7 +431,7 @@ def get_model_based_on_rho(rho, in_channels=1, depth=26, base_channels=128, arch
 
 
 if __name__ == '__main__':
-    model = get_model_based_on_rho(rho=7, arch='cpresnet_damped')
+    model = get_model_based_on_rho(rho=7, arch='cpresnet_damped', in_channels=1, depth=26, base_channels=128, n_classes=10)
     from size_cal import nessi
 
     nessi.get_model_size(model, 'torch', input_size=(1, 1, 256, 44))

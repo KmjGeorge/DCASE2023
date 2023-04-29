@@ -288,7 +288,6 @@ def cp_resnet(mixstyle_conf, rho=4, in_channels=1, arch="cp_resnet", n_classes=1
               base_channels=32, cut_channels_s2=0, cut_channels_s3=0, channels_multiplier=2, n_blocks=(2, 2, 2),
               s1_group=1, s2_group=1, s3_group=1):
     extra_kernal_rf = rho - 4
-
     model_config = {
         "arch": arch,
         "base_channels": base_channels,
@@ -336,8 +335,7 @@ def cp_resnet(mixstyle_conf, rho=4, in_channels=1, arch="cp_resnet", n_classes=1
 if __name__ == '__main__':
     from configs.mixstyle import mixstyle_config
 
-    model = cp_resnet(mixstyle_config, rho=7, s1_group=1, s2_group=2, s3_group=1, cut_channels_s2=4, cut_channels_s3=36)
+    model = cp_resnet(mixstyle_config, rho=8, s2_group=2, cut_channels_s3=36, n_blocks=(2, 1, 1))
     from size_cal import nessi
-
     nessi.get_model_size(model, 'torch', input_size=(1, 1, 256, 44))
     print(model)

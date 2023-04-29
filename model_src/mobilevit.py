@@ -641,6 +641,65 @@ class CPBlock(nn.Module):
 
 
 class MobileAST_Light_CPResNet(nn.Module):
+    def __init__(self, spec_size, num_classes, expansion=2, kernel_size=(3, 3), patch_size=(2, 2),
+                 ):
+        super().__init__()
+
+        ih, iw = spec_size[0], spec_size[1]
+        ph, pw = patch_size[0], patch_size[1]
+        assert ih % ph == 0 and iw % pw == 0
+
+        self.input_c = nn.Sequential(nn.Conv2d(
+            in_channels=1,
+            out_channels=32,
+            kernel_size=3,
+            stride=2,
+            padding=1,
+            bias=False),
+            nn.BatchNorm2d(32),
+            nn.SiLU(True)
+        )
+
+        self.stage1 = _make_stage(in_channels=32, out_channels=32, n_blocks=1, block=CPBlock, maxpool=[0, 1],
+                                  k1s=[3, 1], k2s=[1, 1], groups=1)
+
+        self.mvit_1 = MobileASTBlock(dim=32, depth=8, channel=32, kernel_size=kernel_size, patch_size=patch_size,
+                                     mlp_dim=32 * 2)
+
+        self.stage3 = _make_stage(in_channels=64, out_channels=64, n_blocks=1, block=CPBlock, maxpool=[], k1s=[1, 1],
+                                  k2s=[1, 1], groups=2)
+
+        self.feed_forward = nn.Sequential(
+            nn.Conv2d(
+                64,
+                num_classes,
+                kernel_size=1,
+                stride=1,
+                padding=0,
+                bias=False),
+            nn.BatchNorm2d(num_classes),
+            nn.AdaptiveAvgPool2d((1, 1))
+        )
+
+    def forward(self, x):  # input (1, 1, 128, 64)
+        # x = self.quant(x)
+        x = self.input_c(x)  # (1, 32, 64, 32)
+        # print(x.shape)
+        x = self.stage1(x)
+        # print(x.shape)
+        # x = self.stage2(x)
+        x = self.mvit_1(x)
+        # print(x.shape)
+        x = self.stage3(x)
+        # print(x.shape)
+        x = self.feed_forward(x)
+        # print(x.shape)
+        # x = self.dequant(x)
+        x = x.squeeze(2).squeeze(2)
+        return x
+
+
+class MobileAST_Light_CPResNet2(nn.Module):
     def __init__(self, spec_size, num_classes, kernel_size=(3, 3), patch_size=(2, 2), da_train=False):
         super().__init__()
 
@@ -768,6 +827,15 @@ def mobileast_light(mixstyle_conf):
         return MobileAST_Light((256, 64), num_classes=10, kernel_size=(3, 3), patch_size=(2, 2)).to(device)
 
 
+def mobileast_light2(mixstyle_conf):
+    if mixstyle_conf['enable']:
+        return nn.Sequential(MixStyle(p=mixstyle_conf['p'], alpha=mixstyle_conf['alpha'], freq=mixstyle_conf['freq']),
+                             MobileAST_Light2((256, 64), num_classes=10, kernel_size=(3, 3),
+                                              patch_size=(2, 2)).to(device))
+    else:
+        return MobileAST_Light2((256, 64), num_classes=10, kernel_size=(3, 3), patch_size=(2, 2)).to(device)
+
+
 def mobileast_cpresnet(mixstyle_conf):
     if mixstyle_conf['enable']:
         return nn.Sequential(MixStyle(p=mixstyle_conf['p'], alpha=mixstyle_conf['alpha'], freq=mixstyle_conf['freq']),
@@ -775,6 +843,15 @@ def mobileast_cpresnet(mixstyle_conf):
                                                       patch_size=(2, 2)).to(device))
     else:
         return MobileAST_Light_CPResNet((256, 64), num_classes=10, kernel_size=(3, 3), patch_size=(2, 2)).to(device)
+
+
+def mobileast_cpresnet2(mixstyle_conf):
+    if mixstyle_conf['enable']:
+        return nn.Sequential(MixStyle(p=mixstyle_conf['p'], alpha=mixstyle_conf['alpha'], freq=mixstyle_conf['freq']),
+                             MobileAST_Light_CPResNet2((256, 64), num_classes=10, kernel_size=(3, 3),
+                                                       patch_size=(2, 2)).to(device))
+    else:
+        return MobileAST_Light_CPResNet2((256, 64), num_classes=10, kernel_size=(3, 3), patch_size=(2, 2)).to(device)
 
 
 def mobileast_s(mixstyle_conf):
@@ -794,10 +871,9 @@ if __name__ == '__main__':
     from size_cal import nessi
     from configs.mixstyle import mixstyle_config
 
-    mobileastv3_cpresnet = mobileast_light(mixstyle_config)
+    mobileast_light = mobileast_light(mixstyle_config)
     # mobileast_light2 = MobileAST_Light2(spec_size=(256, 64), num_classes=10, kernel_size=(3, 3), patch_size=(2, 2))
-    blockv1 = MobileASTBlock(dim=32, depth=8, channel=32, kernel_size=(3, 3), patch_size=(2, 2), mlp_dim=32 * 2)
-    blockv3 = MobileASTBlockv3(dim=32, depth=8, channel=32, kernel_size=(3, 3), patch_size=(2, 2), mlp_dim=32 * 2)
+
     # nessi.get_model_size(blockv1, 'torch', (1, 32, 32, 16))
     # nessi.get_model_size(blockv3, 'torch', (1, 32, 32, 16))
     # model = mobileast_xxs(mixstyle_conf=mixstyle_config)
@@ -810,8 +886,8 @@ if __name__ == '__main__':
     # 评估模型参数量和MACC
 
     # nessi.get_model_size(model, 'torch', (1, 1, 256, 64))
-    nessi.get_model_size(mobileastv3_cpresnet, 'torch', (1, 1, 256, 64))
-    print(mobileastv3_cpresnet)
+    nessi.get_model_size(mobileast_light, 'torch', (1, 1, 256, 64))
+    print(mobileast_light)
     # nessi.get_model_size(stage1, 'torch', (1, 24, 128, 32))
     # nessi.get_model_size(mobileastblock, 'torch', input_size=(1, 64, 64, 32))
     # nessi.get_model_size(model, 'torch', input_size=(1, 1, 128, 64))

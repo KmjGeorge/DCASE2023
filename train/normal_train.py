@@ -22,7 +22,6 @@ def train(model, train_loader, test_loader, normal_training_conf, mixup_conf,
     val_acc_a_list = []
     val_acc_b_list = []
     val_acc_c_list = []
-    val_acc_b_list = []
     val_acc_s1_list = []
     val_acc_s2_list = []
     val_acc_s3_list = []
