@@ -9,8 +9,8 @@ from model_src.module.mixstyle import MixStyle
 
 
 def get_model_wrapper(n_classes, **kwargs):
-    mel = AugmentMelSTFT(n_mels=128, sr=32000, win_length=800, hopsize=320, n_fft=1024, freqm=48,
-                         timem=20,
+    mel = AugmentMelSTFT(n_mels=128, sr=32000, win_length=800, hopsize=320, n_fft=1024, freqm=0,
+                         timem=0,
                          htk=False, fmin=0.0, fmax=None, norm=1, fmin_aug_range=1,
                          fmax_aug_range=1)
     '''
@@ -86,6 +86,7 @@ def load_pretrained_weights(passt, n_classes):
     passt_dict['head_dist.bias'] = head_dist_bias
 
     passt.load_state_dict(passt_dict)
+    print('加载预训练参数完成')
 
 
 def passt(mixstyle_conf, pretrained_local=True, n_classes=10):

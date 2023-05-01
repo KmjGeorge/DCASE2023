@@ -4,7 +4,7 @@ import torch.nn as nn
 import torchaudio
 import matplotlib.pyplot as plt
 import librosa
-from dataset.augmentation import gauss_noise
+from dataset.augmentation import gauss_noise, timerolling
 
 
 def plot_waveform(waveform, sample_rate):
@@ -87,9 +87,14 @@ class ExtractMel(nn.Module):
             self.timem = torch.nn.Identity()
         else:
             self.timem = torchaudio.transforms.TimeMasking(kwargs['timem'], iid_masks=True)
+        self.timerolling = kwargs['timerolling']
+        self.gauss_snr = kwargs['gauss_snr']
 
     def forward(self, x):
-        # x = gauss_noise(x, snr=20)  # 添加高斯噪声
+        # 只在训练时使用高斯噪声与timerolling
+        if self.training:
+            x = gauss_noise(x, snr=self.gauss_snr)
+            x = timerolling(x, axis=1, shift=self.timerolling)
         x = nn.functional.conv1d(x.unsqueeze(1), self.preemphasis_coefficient).squeeze(1)  # 预加重
 
         x = torch.stft(x, self.n_fft, hop_length=self.hop_length, win_length=self.win_length,  # stft
@@ -125,7 +130,8 @@ class ExtractMel(nn.Module):
 
 if __name__ == '__main__':
     from configs.dataconfig import spectrum_config
-
+    from run.run import setup_seed
+    setup_seed(200)
     # 测试
     extmel = ExtractMel(**spectrum_config)
     batch = []
@@ -144,3 +150,4 @@ if __name__ == '__main__':
     batch = extmel(batch)
     print(batch.shape)  # (batchsize, C, F, T)  其中C=1, F=n_mels, T=sr*time // hop_length 向上取整
     plot_spectrogram(batch[0])
+    plot_spectrogram(batch[1])

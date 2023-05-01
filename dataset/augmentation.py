@@ -20,6 +20,8 @@ def mixup(x, y, alpha):
 
 # 添加高斯噪声，输入是一个batch的波形, snr为信噪比(dB)
 def gauss_noise(batch_audio, snr):
+    if snr == 0:
+        return batch_audio
     noise_batch = []
     for audio in batch_audio:
         audio_numpy = audio.cpu().numpy()
@@ -84,7 +86,8 @@ def rand_bbox(size, lam):
 
 
 # 将波形沿时间轴随机滚动
-def timerolling(x, axis=2, shift=50):
+# 当输入是一个batch的波形时, axis=1 否则为0
+def timerolling(x, axis=1, shift=50):
     sf = int(np.random.random_integers(-shift, shift))
     return x.roll(sf, axis)
 

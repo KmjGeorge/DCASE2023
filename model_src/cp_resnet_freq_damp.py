@@ -325,7 +325,8 @@ class Network(nn.Module):
             for m_i, mp_pos in enumerate(maxpool):
                 if index + 1 == mp_pos:
                     stage.add_module("maxpool{}_{}".format(index + 1, m_i)
-                                     , nn.MaxPool2d(2, 1, padding=self.pooling_padding))   # maxpool (2,2) -> (2,1)
+                                     , nn.MaxPool2d((2, 1), stride=(2, 1),
+                                                    padding=self.pooling_padding))  # maxpool (2,2) -> (2,1)
         return stage
 
     def half_damper(self):
@@ -396,7 +397,7 @@ def get_model_based_on_rho(rho, in_channels=1, depth=26, base_channels=128, arch
         "multi_label": False,
         "n_classes": n_classes,
         "prediction_threshold": 0.4,
-        "stage1": {"maxpool": [1, 2, 4],
+        "stage1": {"maxpool": [0, 2, 4],
                    "k1s": [3,
                            3 - (-extra_kernal_rf > 6) * 2,
                            3 - (-extra_kernal_rf > 4) * 2,
@@ -431,7 +432,8 @@ def get_model_based_on_rho(rho, in_channels=1, depth=26, base_channels=128, arch
 
 
 if __name__ == '__main__':
-    model = get_model_based_on_rho(rho=7, arch='cpresnet_damped', in_channels=1, depth=26, base_channels=128, n_classes=10)
+    model = get_model_based_on_rho(rho=8, arch='cpresnet_damped', in_channels=1, depth=14,  base_channels=128,
+                                   n_classes=10)
     from size_cal import nessi
 
     nessi.get_model_size(model, 'torch', input_size=(1, 1, 256, 44))

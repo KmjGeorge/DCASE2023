@@ -8,6 +8,7 @@ import numpy as np
 from size_cal import nessi
 from model_src.mobilevit import mobileast_light, mobileast_cpresnet2, mobileast_light2, mobileast_cpresnet
 from model_src.cp_resnet import cp_resnet
+from model_src.cp_resnet_freq_damp import get_model_based_on_rho
 from model_src.passt import passt
 from model_src.acdnet import GetACDNetModel
 from dataset.spectrum import ExtractMel
@@ -49,9 +50,18 @@ def get_model(name, wave=True):
         else:
             model = mobileast_cpresnet2(mixstyle_conf=mixstyle_config).to(device)
     elif name == 'passt':
-        model = passt(mixstyle_conf=mixstyle_config, pretrained_local=False, n_classes=10).to(device)
+        model = passt(mixstyle_conf=mixstyle_config, pretrained_local=True, n_classes=10).to(device)
     elif name == 'acdnet':
         model = GetACDNetModel(mixstyle_conf=mixstyle_config, input_len=32000, nclass=10, sr=spectrum_config['sr'])
+    elif name == 'damped_cp_resnet':
+        if wave:
+            model = nn.Sequential(ExtractMel(**spectrum_config),
+                                  get_model_based_on_rho(rho=8, arch='cpresnet_damped', in_channels=1, depth=14,
+                                                         base_channels=128,
+                                                         n_classes=10)).to(device)
+        else:
+            model = get_model_based_on_rho(rho=8, arch='cpresnet_damped', in_channels=1, depth=14, base_channels=128,
+                                   n_classes=10).to(device)
     else:
         raise '未定义的模型！'
 

@@ -124,6 +124,7 @@ if __name__ == '__main__':
                                                                                        test_loader=test_dataloader,
                                                                                        distillation_conf=distillation_config,
                                                                                        mixup_conf=mixup_config,
+                                                                                       mode='dkd',
                                                                                        save=True)
     '''6. 绘制曲线
     曲线存放于figure文件夹 文件名为training_config['task_name']名
