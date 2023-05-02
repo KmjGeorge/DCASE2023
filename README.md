@@ -14,7 +14,7 @@ pytorch版本请低于2.0
 pip install -e 'git+https://github.com/kkoutini/passt_hear21@0.0.19#egg=hear21passt' 
 ```
 
-
+# 此Readme为旧版，等待更新
 
 ## I. 文件结构
 
@@ -22,23 +22,23 @@ pip install -e 'git+https://github.com/kkoutini/passt_hear21@0.0.19#egg=hear21pa
 PROJECT ROOT
 │   README.md	
 |   requirements.txt
-└───compress	========>  存放模型压缩策略(如量化)		
+└───compress	        ========>  存放模型压缩策略(如量化)		
 │   │   quantization.py(未完成)
 
-└───configs	    ========>  存放配置文件
-│   │   dataconfig.py	 				数据集及频谱参数配置
+└───configs	        ========>  存放配置文件
+│   │   dataconfig.py	 			数据集及频谱参数配置
 │   │   trainingconfig.py   			训练参数配置
-│   │   mixup.py   						mixup参数
-│   │   mixstyle.py   					mixstyle参数
+│   │   mixup.py   				mixup参数
+│   │   mixstyle.py   				mixstyle参数
 
-└───dataset     ========>  存放数据处理相关					
+└───dataset             ========>  存放数据处理相关					
 │   │   augmentation.py					数据增强策略	
 │   │   datagenerator.py				数据集制作(以h5存储)和读取（返回Datagenerator供网络训练）
-│   │   spectrum.py						频谱特征提取，是一个继承nn.Module的类，作为网络的输入层使用
-│   │   files_reassembled.ipynb			制作reassembled数据集（10s），拼接音频文件
-|   |   meta_csv_reassembled.ipynb		制作reassembled数据集（10s），拼接meta文件
-│   └───h5      	========>  存放数据集的h5存储（文件过大不好上传，请运行datagenerator.py制作，完成后应当有以下文件）
-| 	|	|   tau2022_train.h5			
+│   │   spectrum.py					频谱特征提取，是一个继承nn.Module的类，作为网络的输入层使用
+│   │   files_reassembled.ipynb			        制作reassembled数据集（10s），拼接音频文件
+|   |   meta_csv_reassembled.ipynb		        制作reassembled数据集（10s），拼接meta文件
+│   └───h5      ========>  存放数据集的h5存储（文件过大不好上传，请运行datagenerator.py制作，完成后应当有以下文件）
+|   |	|   tau2022_train.h5			
 |   |   |   tau2022_test.h5
 |   |   |   tau2022_reassembled_train.h5
 |   |   |   tau2022_reassembled_test.h5
@@ -49,36 +49,40 @@ PROJECT ROOT
 └───logs		========>  存放训练日志
 │   │   (empty)
 
-└───model_src	========>  存放训练日志
-|   │   acdnet.py						ACDNet(https://doi.org/10.1016/j.patcog.2022.109025)
-|   │	cp_resnet.py					CP_ResNet(https://arxiv.org/abs/2105.12395v1)，此处是去年第一使用的配置
+└───model_src	        ========>  存放模型定义
+|   │   acdnet.py					ACDNet(https://doi.org/10.1016/j.patcog.2022.109025)
+|   │	cp_resnet.py					CP_ResNet(https://arxiv.org/abs/2105.12395v1)，此为去年第一使用的配置
+|   |	cp_resnet_freq_damp.py	                        CP_ResNet 使用频率上的damp，目前作为教师使用
 |   |	mobilevit.py					MobileViT(https://arxiv.org/abs/2110.02178v2)，并把它迁移到音频上
-|   |	passt.py						PaSST(https://arxiv.org/abs/2110.05069)，此处使用hear21passt库的实现
-|   | 	rfr_cnn.py						去年第三使用的RFR_CNN(教师)，见   
-             https://dcase.community/documents/challenge2022/technical_reports/DCASE2022_Morocutti_96_t1.pdf 
+|   |	passt.py					PaSST(https://arxiv.org/abs/2110.05069)，此处使用hear21passt库的实现
+|   				 
 |   └───module		========> 网络结构使用到的模块请放到此处
-|	|	| 	mixstyle.py					MixStyle，添加参数freq=True可使用频率上的MixStyle
-|	|	| 	rfn.py						松弛频率归一化 Relaxed instance frequency-wise normalization
-|   |   |	ssn.py						子谱归一化 Sub-spectrum Normalization
+|	|	| 	mixstyle.py				MixStyle，添加参数freq=True可使用频率上的MixStyle
+|	|	| 	rfn.py					松弛频率归一化 Relaxed instance frequency-wise normalization
+|       |       |	ssn.py					子谱归一化 Sub-spectrum Normalization
+|       |       |       grl.py                                  梯度反转层，用于域对抗训练
 
-└───model_weights ========> 存放模型参数
+└───model_weights       ========> 存放模型参数
 |	└───pretrained	========> 存放预训练参数
 
 └───optim		========> 自定义优化器和学习率调度器
-|	|	scheduler.py	学习率调度器，目前实现了WarmUp，与退火配合使用
-|	|	test.py			测试调度器，绘制学习率曲线
+|	|	scheduler.py	自定义学习率调度器
+|	|	test.py		测试调度器，绘制学习率曲线
 
-└───size_cal	========> 官方给出的模型复杂度计算器
+└───size_cal	        ========> 官方给出的模型复杂度计算器
 |	...
 |	...
 
 └───train		========> 定义训练过程
 |	|	normal_train.py					定义普通训练过程
 |	|	distillation.py					定义知识蒸馏过程
+|       |       domain_adversarial.py                           定义域对抗训练过程(未完成)
 
-└───run
-|	|	run.py							主程序入口
-|	|	testscript.py					测试脚本
+└───run                 ========> 定义运行流程
+|	|	run.py						训练某一模型，读取配置configs.trainingconfig.normal_training_config
+|       |       dis_run.py                                      蒸馏某一模型，读取配置configs.trainingconfig.distillation_config
+|       |       evaluate.py                                     评估，使用验证集计算准确率
+|	|	testscript.py					测试脚本，开发用
 ```
 
 
@@ -97,9 +101,9 @@ PROJECT ROOT
 
 ##### ①设置数据采样率
 
-​		configs/dataconfig/spectrum_config ['sr']，默认为32000
+​		configs.dataconfig.spectrum_config ['sr']，默认为32000
 
-		##### ①制作原版数据集
+##### ②制作原版数据集
 
 ​		<1>将configs/dataconfig的data_config更改为：
 
@@ -117,7 +121,7 @@ dataset_config = {
 
 ​		<2>运行datagenerator.py
 
-##### ②reassembled版
+##### ③reassembled版数据集
 
 ​		<1>将configs/dataconfig的data_config更改为：
 
@@ -135,14 +139,14 @@ dataset_config = {
 
 ​		<2>运行datagenerator.py
 
-#####  ③完成后，h5path下应当有如下文件：
+#####  ④完成后，h5path下应当有如下文件：
 
 ```
-| data_config['h5path']
-| 	tau2022_train.h5			
-|   tau2022_test.h5
-|   tau2022_reassembled_train.h5
-|   tau2022_reassembled_test.h5
+└───data_config['h5path']
+|   |  tau2022_train.h5			
+|   |  tau2022_test.h5
+|   |  tau2022_reassembled_train.h5
+|   |  tau2022_reassembled_test.h5
 ```
 
 
