@@ -53,7 +53,7 @@ def extract_spectrum(audio, sr, n_fft, hop_length, win_length, n_mels):
 
 # torchaudio提取log mel + specaugment
 class ExtractMel(nn.Module):
-    def __init__(self, **kwargs):
+    def __init__(self, single=False, **kwargs):
         torch.nn.Module.__init__(self)
 
         self.win_length = kwargs['win_length']
@@ -89,8 +89,12 @@ class ExtractMel(nn.Module):
             self.timem = torchaudio.transforms.TimeMasking(kwargs['timem'], iid_masks=True)
         self.timerolling = kwargs['timerolling']
         self.gauss_snr = kwargs['gauss_snr']
+        self.single = single
 
     def forward(self, x):
+        if self.single:
+            x = torch.unsqueeze(x, dim=0)
+
         # 只在训练时使用高斯噪声与timerolling
         if self.training:
             x = gauss_noise(x, snr=self.gauss_snr)
@@ -124,16 +128,18 @@ class ExtractMel(nn.Module):
             melspec = self.timem(melspec)
 
         melspec = (melspec + 4.5) / 5.  # fast normalization
-
-        return torch.unsqueeze(melspec, dim=1)  # 添加一个通道维度
+        if not self.single:
+            melspec = torch.unsqueeze(melspec, dim=1)  # 添加一个通道维度
+        return melspec
 
 
 if __name__ == '__main__':
     from configs.dataconfig import spectrum_config
     from run.run import setup_seed
-    setup_seed(200)
+    setup_seed(300)
     # 测试
     extmel = ExtractMel(**spectrum_config)
+    extmel_single = ExtractMel(single=True, **spectrum_config)
     batch = []
     x1, _ = librosa.load(
         'D:/Datasets/TAU-urban-acoustic-scenes-2022-mobile-development/audio/airport-barcelona-0-0-0-a.wav',
@@ -148,6 +154,8 @@ if __name__ == '__main__':
     batch = torch.tensor(batch)
     print(batch.shape)  # (batchsize, sr*time)
     batch = extmel(batch)
+    x1_mel = extmel_single(torch.from_numpy(x1))
     print(batch.shape)  # (batchsize, C, F, T)  其中C=1, F=n_mels, T=sr*time // hop_length 向上取整
     plot_spectrogram(batch[0])
-    plot_spectrogram(batch[1])
+    # plot_spectrogram(batch[1])
+    plot_spectrogram(x1_mel)

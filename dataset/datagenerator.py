@@ -68,7 +68,7 @@ class TAU2022(Dataset):
         self.slicing = slicing
         self.mel = mel
         if self.mel:
-            self.ext = ExtractMel(**spectrum_config)
+            self.ext = ExtractMel(single=True, **spectrum_config)
 
     def __len__(self):
         return len(self.Z)
@@ -83,12 +83,11 @@ class TAU2022(Dataset):
             clip_idx = random.randint(0, 9000)  # 总时长10000ms 取其中1000ms
             audio = audio[int(clip_idx * SR / 1000): int((clip_idx + 1000) * SR / 1000)]
         if self.mel:
-            audio = self.ext(audio)
+            audio = self.ext(torch.from_numpy(audio))
         return audio, label, device
 
-    # 构建tau2022数据集 以h5存储 包括：数据(波形) 类别标签 设备标签
 
-
+# 构建tau2022数据集 以h5存储 包括：数据(波形) 类别标签 设备标签
 def make_tau2022(meta_path, h5_path, reassembled=False):
     assert not os.path.exists(h5_path), "文件{}已存在！".format(h5_path)
     if reassembled:

@@ -22,31 +22,32 @@ def get_model(name, wave=True):
     if name == 'cp_resnet':
         if wave:
             model = nn.Sequential(ExtractMel(**spectrum_config),
-                                  cp_resnet(mixstyle_config, rho=8, s2_group=2, cut_channels_s3=36, n_blocks=(2, 1, 1))).to(device)
+                                  cp_resnet(mixstyle_config, rho=8, s2_group=2, cut_channels_s3=36,
+                                            n_blocks=(2, 1, 1))).to(device)
         else:
             model = cp_resnet(mixstyle_config, rho=8, s2_group=2, cut_channels_s3=36, n_blocks=(2, 1, 1)).to(device)
     elif name == 'mobileast_light':
         if wave:
             model = nn.Sequential(ExtractMel(**spectrum_config), mobileast_light(mixstyle_conf=mixstyle_config)).to(
-               device)
+                device)
         else:
             model = mobileast_light(mixstyle_conf=mixstyle_config).to(device)
     elif name == 'mobileast_light2':
         if wave:
             model = nn.Sequential(ExtractMel(**spectrum_config), mobileast_light2(mixstyle_conf=mixstyle_config)).to(
-               device)
+                device)
         else:
             model = mobileast_light2(mixstyle_conf=mixstyle_config).to(device)
     elif name == 'mobileast_cpresnet':
         if wave:
             model = nn.Sequential(ExtractMel(**spectrum_config), mobileast_cpresnet(mixstyle_conf=mixstyle_config)).to(
-               device)
+                device)
         else:
             model = mobileast_cpresnet(mixstyle_conf=mixstyle_config).to(device)
     elif name == 'mobileast_cpresnet2':
         if wave:
             model = nn.Sequential(ExtractMel(**spectrum_config), mobileast_cpresnet2(mixstyle_conf=mixstyle_config)).to(
-               device)
+                device)
         else:
             model = mobileast_cpresnet2(mixstyle_conf=mixstyle_config).to(device)
     elif name == 'passt':
@@ -56,12 +57,12 @@ def get_model(name, wave=True):
     elif name == 'damped_cp_resnet':
         if wave:
             model = nn.Sequential(ExtractMel(**spectrum_config),
-                                  get_model_based_on_rho(rho=8, arch='cpresnet_damped', in_channels=1, depth=14,
+                                  get_model_based_on_rho(rho=7, arch='cpresnet_damped', in_channels=1, depth=20,
                                                          base_channels=128,
                                                          n_classes=10)).to(device)
         else:
-            model = get_model_based_on_rho(rho=8, arch='cpresnet_damped', in_channels=1, depth=14, base_channels=128,
-                                   n_classes=10).to(device)
+            model = get_model_based_on_rho(rho=7, arch='cpresnet_damped', in_channels=1, depth=20, base_channels=128,
+                                           n_classes=10).to(device)
     else:
         raise '未定义的模型！'
 
@@ -111,15 +112,15 @@ if __name__ == '__main__':
     TASK_NAME = normal_training_config['task_name']
 
     '''2. 获取模型'''
-    model = get_model(CHOOSE_MODEL, wave=True)
+    model = get_model(CHOOSE_MODEL, wave=False)
 
-    '''3. 计算模型大小，需指定输入形状 (batch, sr*time) '''
-    nessi.get_model_size(model, 'torch', input_size=(1, spectrum_config['sr'] * 1))
+    '''3. 计算模型大小，需指定输入形状 (batch, sr*time) 或 (batch, channel, f, t)'''
+    nessi.get_model_size(model, 'torch', input_size=(1, 1, 256, 44))
 
     '''4. 获取数据集'''
     # 请先在dataset.datagenerator中生成数据集(h5形式)
     if DATASET_NAME == 'TAU2022_RANDOM_SLICING' or DATASET_NAME == 'tau2022_random_slicing':
-        train_dataloader, test_dataloader = dataset.datagenerator.get_tau2022_reassembled_random_slicing()
+        train_dataloader, test_dataloader = dataset.datagenerator.get_tau2022_reassembled_random_slicing(mel=True)
     elif DATASET_NAME == 'TAU2022' or DATASET_NAME == 'tau2022':
         train_dataloader, test_dataloader = dataset.datagenerator.get_tau2022()
     elif DATASET_NAME == 'TAU2022_REASSEMBLED' or DATASET_NAME == 'tau2022_reassembled':
