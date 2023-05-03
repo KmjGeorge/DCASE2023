@@ -143,6 +143,7 @@ def distillation_per_epoch(student, teacher, train_loader, hard_criterion, soft_
                            save=True):
     correct = 0
     total = 0
+    total_batch = 0
     sum_loss = 0.0
     student.train()
 
@@ -158,13 +159,18 @@ def distillation_per_epoch(student, teacher, train_loader, hard_criterion, soft_
         else:
             if np.random.rand(1) < mixup_conf['p']:
                 if mixup_conf['cut']:
-                    x_mix, y_a, y_b, lamb = cutmix(x, y, mixup_conf['alpha'])
+                    mel = student[0](x)   # cutmix是对特征图的处理，先提取mel谱
+                    mel_mix, y_a, y_b, lamb = cutmix(mel, y, mixup_conf['alpha'])
+                    mel_mix = mel_mix.to(device)
+                    y_a = y_a.to(device)
+                    y_b = y_b.to(device)
+                    y_pred_mix = student[1](mel_mix)
                 else:
                     x_mix, y_a, y_b, lamb = mixup(x, y, mixup_conf['alpha'])
-                x_mix = x_mix.to(device)
-                y_a = y_a.to(device)
-                y_b = y_b.to(device)
-                y_pred_mix = student(x_mix)
+                    x_mix = x_mix.to(device)
+                    y_a = y_a.to(device)
+                    y_b = y_b.to(device)
+                    y_pred_mix = student(x_mix)
                 hard_loss = lamb * hard_criterion(y_pred_mix, y_a) + (1 - lamb) * hard_criterion(y_pred_mix, y_b)
             else:
                 hard_loss = hard_criterion(y_pred_nomix, y)
@@ -188,15 +194,16 @@ def distillation_per_epoch(student, teacher, train_loader, hard_criterion, soft_
             y_ = torch.argmax(y_pred_nomix, dim=1)  # 使用非mixup的数据计算acc
             correct += (y_ == y).sum().item()
             total += y.size(0)
+            total_epoch += 1
             sum_loss += loss.item()
-            running_loss = sum_loss / total
+            running_loss = sum_loss / total_batch
             running_acc = correct / total
 
         # 输出训练信息
         loop.set_description(f'Epoch [{start_epoch + epoch + 1}/{epochs + start_epoch}]')
         loop.set_postfix(lr=lr, loss=running_loss, acc=running_acc)
     scheduler.step()  # 更新学习率
-    epoch_loss = sum_loss / total
+    epoch_loss = sum_loss / total_batch
     epoch_acc = correct / total
 
     if save:
@@ -215,6 +222,7 @@ def dkd_per_epoch(student, teacher, train_loader, T, alpha, beta, start_epoch, o
     """
     correct = 0
     total = 0
+    total_batch = 0
     sum_loss = 0.0
     student.train()
     loop = tqdm(train_loader)
@@ -234,13 +242,18 @@ def dkd_per_epoch(student, teacher, train_loader, T, alpha, beta, start_epoch, o
         else:
             if np.random.rand(1) < mixup_conf['p']:
                 if mixup_conf['cut']:
-                    x_mix, y_a, y_b, lamb = cutmix(x, y, mixup_conf['alpha'])
+                    mel = student[0](x)
+                    x_mix, y_a, y_b, lamb = cutmix(mel, y, mixup_conf['alpha'])
+                    x_mix = x_mix.to(device)
+                    y_a = y_a.to(device)
+                    y_b = y_b.to(device)
+                    y_pred_mix = student[1](x_mix)
                 else:
                     x_mix, y_a, y_b, lamb = mixup(x, y, mixup_conf['alpha'])
-                x_mix = x_mix.to(device)
-                y_a = y_a.to(device)
-                y_b = y_b.to(device)
-                y_pred_mix = student(x_mix)
+                    x_mix = x_mix.to(device)
+                    y_a = y_a.to(device)
+                    y_b = y_b.to(device)
+                    y_pred_mix = student(x_mix)
                 loss_ce_a = F.cross_entropy(y_pred_mix, y_a)
                 loss_ce_b = F.cross_entropy(y_pred_mix, y_b)
                 loss_ce = lamb * loss_ce_a + (1 - lamb) * loss_ce_b
@@ -258,7 +271,7 @@ def dkd_per_epoch(student, teacher, train_loader, T, alpha, beta, start_epoch, o
             correct += (y_ == y).sum().item()
             total += y.size(0)
             sum_loss += loss.item()
-            running_loss = sum_loss / total
+            running_loss = sum_loss / total_batch
             running_acc = correct / total
 
         # 输出训练信息
@@ -266,7 +279,7 @@ def dkd_per_epoch(student, teacher, train_loader, T, alpha, beta, start_epoch, o
         loop.set_postfix(lr=lr, loss=running_loss, acc=running_acc)
 
     scheduler.step()
-    epoch_loss = sum_loss / total
+    epoch_loss = sum_loss / total_batch
     epoch_acc = correct / total
     if save:
         torch.save(student.state_dict(),

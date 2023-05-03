@@ -114,6 +114,7 @@ def train_per_epoch(model, train_loader, criterion, optimizer, scheduler, start_
                     save=True):
     correct = 0
     total = 0
+    total_batch = 0
     sum_loss = 0.0
 
     model.train()
@@ -130,15 +131,20 @@ def train_per_epoch(model, train_loader, criterion, optimizer, scheduler, start_
         else:
             if np.random.rand(1) < mixup_conf['p']:
                 if mixup_conf['cut']:  # 使用cutmix
-                    x_mix, y_a, y_b, lamb = cutmix(x, y, mixup_conf['alpha'])
+                    mel = model[0](x)
+                    mel_mix, y_a, y_b, lamb = cutmix(mel, y, mixup_conf['alpha'])
+                    mel_mix = mel_mix.to(device)
+                    y_a = y_a.to(device)
+                    y_b = y_b.to(device)
+                    y_pred = model[1](mel_mix)
                 else:
                     x_mix, y_a, y_b, lamb = mixup(x, y, mixup_conf['alpha'])
-                x_mix = x_mix.to(device)
-                y_a = y_a.to(device)
-                y_b = y_b.to(device)
+                    x_mix = x_mix.to(device)
+                    y_a = y_a.to(device)
+                    y_b = y_b.to(device)
+                    y_pred = model(x_mix)
 
                 optimizer.zero_grad()
-                y_pred = model(x_mix)
                 loss = lamb * criterion(y_pred, y_a) + (1 - lamb) * criterion(y_pred, y_b)
             else:
                 optimizer.zero_grad()
@@ -154,15 +160,16 @@ def train_per_epoch(model, train_loader, criterion, optimizer, scheduler, start_
             y_ = torch.argmax(y_pred_nomix, dim=1)
             correct += (y_ == y).sum().item()
             total += y.size(0)
+            total_batch += 1
             sum_loss += loss.item()
-            running_loss = sum_loss / total
+            running_loss = sum_loss / total_batch  # loss已经是按batch计算的，均值分母为batch数
             running_acc = correct / total
 
         # 输出训练信息
         loop.set_description(f'Epoch [{start_epoch + epoch + 1}/{start_epoch + epochs}]')
         loop.set_postfix(lr=lr, loss=running_loss, acc=running_acc)
     scheduler.step()  # 更新学习率
-    epoch_loss = sum_loss / total
+    epoch_loss = sum_loss / total_batch
     epoch_acc = correct / total
     if save:
         torch.save(model.state_dict(),
@@ -173,6 +180,7 @@ def train_per_epoch(model, train_loader, criterion, optimizer, scheduler, start_
 def validate(model, test_loader, criterion):
     test_correct = 0
     test_total = 0
+    test_total_batch = 0
     test_sum_loss = 0
 
     test_device_info = {k: [0, 0, 0.0] for k in TAU2022_DEVICES.keys()}  # key:设备标签 v: [total_num, correct_num, acc]
@@ -189,8 +197,9 @@ def validate(model, test_loader, criterion):
             y_ = torch.argmax(y_pred, dim=1)
             test_correct += (y_ == y).sum().item()
             test_total += y.size(0)
+            test_total_batch += 1
             test_sum_loss += loss.item()
-            test_running_loss = test_sum_loss / test_total
+            test_running_loss = test_sum_loss / test_total_batch
             test_running_acc = test_correct / test_total
 
             # 计算每个设备的准确率
@@ -214,7 +223,7 @@ def validate(model, test_loader, criterion):
                              S6=test_device_info['s6'][2],
                              )
 
-    test_epoch_loss = test_sum_loss / test_total
+    test_epoch_loss = test_sum_loss / test_total_batch
     test_epoch_acc = test_correct / test_total
 
     model.train()

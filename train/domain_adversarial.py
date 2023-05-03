@@ -106,6 +106,7 @@ def da_train_per_epoch(model, train_loader, criterion, optimizer, scheduler, sta
                        save=True):
     correct = 0
     total = 0
+    total_batch = 0
     sum_loss = 0.0
 
     model.train()
@@ -164,15 +165,16 @@ def da_train_per_epoch(model, train_loader, criterion, optimizer, scheduler, sta
             y_ = torch.argmax(y_pred_nomix, dim=1)
             correct += (y_ == y).sum().item()
             total += y.size(0)
+            total_batch += 1
             sum_loss += loss.item()
-            running_loss = sum_loss / total
+            running_loss = sum_loss / total_batch
             running_acc = correct / total
 
         # 输出训练信息
         loop.set_description(f'Epoch [{start_epoch + epoch + 1}/{start_epoch + epochs}]')
         loop.set_postfix(lr=lr, loss=running_loss, acc=running_acc)
     scheduler.step()  # 更新学习率
-    epoch_loss = sum_loss / total
+    epoch_loss = sum_loss / total_batch
     epoch_acc = correct / total
     if save:
         torch.save(model.state_dict(),
