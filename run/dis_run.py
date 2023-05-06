@@ -6,7 +6,8 @@ import random
 import numpy as np
 
 from model_src.cp_resnet import cp_resnet
-from model_src.mobilevit import mobileast_light2, mobileast_light, mobileast_cpresnet2
+from model_src.cp_resnet_freq_damp import get_model_based_on_rho
+from model_src.mobilevit import mobileast_light2, mobileast_light, mobileast_cpresnet2, mobileast_cpresnet
 from model_src.passt import passt
 from size_cal import nessi
 from dataset.spectrum import ExtractMel
@@ -38,12 +39,27 @@ def get_model(name, wave=True):
             model = mobileast_light2(mixstyle_conf=mixstyle_config).to(device)
     elif name == 'mobileast_cpresnet':
         if wave:
+            model = nn.Sequential(ExtractMel(**spectrum_config), mobileast_cpresnet(mixstyle_conf=mixstyle_config)).to(
+                device)
+        else:
+            model = mobileast_cpresnet(mixstyle_conf=mixstyle_config).to(device)
+    elif name == 'mobileast_cpresnet2':
+        if wave:
             model = nn.Sequential(ExtractMel(**spectrum_config), mobileast_cpresnet2(mixstyle_conf=mixstyle_config)).to(
                 device)
         else:
             model = mobileast_cpresnet2(mixstyle_conf=mixstyle_config).to(device)
     elif name == 'passt':
         model = passt(mixstyle_conf=mixstyle_config, pretrained_local=False, n_classes=10).to(device)
+    elif name == 'damped_cp_resnet':
+        if wave:
+            model = nn.Sequential(ExtractMel(**spectrum_config),
+                                  get_model_based_on_rho(rho=7, arch='cpresnet_damped', in_channels=1, depth=20,
+                                                         base_channels=128,
+                                                         n_classes=10)).to(device)
+        else:
+            model = get_model_based_on_rho(rho=7, arch='cpresnet_damped', in_channels=1, depth=20, base_channels=128,
+                                           n_classes=10).to(device)
     else:
         raise '未定义的模型！'
 
@@ -96,16 +112,18 @@ if __name__ == '__main__':
 
     '''2. 获取模型'''
     teacher = get_model(TEACHER_MODEL)
-    student = get_model(STUDENT_MODEL)
+    student = get_model(STUDENT_MODEL, wave=True)
     weights = torch.load(TEACHER_WEIGHT_PATH)
     # weights_new = {}
     # for k, v in weights.items():
     #     weights_new[k.replace('net.1.', 'net.')] = v
     teacher.load_state_dict(weights)
+    teacher.eval()
 
     '''3. 计算模型大小，需指定输入形状 (batch, sr*time) '''
     nessi.get_model_size(teacher, 'torch', input_size=(1, spectrum_config['sr'] * 1))
     nessi.get_model_size(student, 'torch', input_size=(1, spectrum_config['sr'] * 1))
+
 
     '''4. 获取数据集'''
     # 请先在dataset.datagenerator中生成数据集(h5形式)

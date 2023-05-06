@@ -270,6 +270,7 @@ def dkd_per_epoch(student, teacher, train_loader, T, alpha, beta, start_epoch, o
             y_ = torch.argmax(y_pred_no_mix, dim=1)
             correct += (y_ == y).sum().item()
             total += y.size(0)
+            total_batch += 1
             sum_loss += loss.item()
             running_loss = sum_loss / total_batch
             running_acc = correct / total
