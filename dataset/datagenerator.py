@@ -117,6 +117,42 @@ def make_tau2022(meta_path, h5_path, reassembled=False):
     print('制作h5数据集完成，保存至 {}'.format(h5_path))
 
 
+# 构建tau2022数据集(只含某类别) 以h5存储 包括：数据(波形) 类别标签 设备标签
+def make_tau2022_per_class(meta_path, h5_path, scene_class, reassembled=False):
+    h5_folder, h5_name = os.path.split(h5_path)
+    h5_name = h5_name.replace('.h5', "_") + scene_class + '.h5'
+    h5_path_per_class = os.path.join(h5_folder, h5_name)
+    assert not os.path.exists(h5_path_per_class), "文件{}已存在！".format(h5_path)
+    if reassembled:
+        df = pd.read_csv(meta_path)
+        df2 = pd.read_csv(dataset_config['meta_path'])
+    else:
+        df = pd.read_csv(meta_path, sep='\t')
+        df2 = pd.read_csv(dataset_config['meta_path'], sep='\t')
+    X = []
+    Y = []
+    Z = []
+    loop = tqdm(df['filename'])
+    for filename in loop:
+        scene_label = df[df['filename'] == filename]['scene_label'].values[0]
+        if scene_label != scene_class:
+            continue
+        source_label = df2[df2['filename'] == filename]['source_label'].values[0]
+        full_path = os.path.join(AUDIO_PATH, filename)
+        audio, _ = librosa.load(full_path, sr=SR)
+        X.append(audio)
+        Y.append(TAU2022_CLASSES[scene_label])  # 标签转数字
+        Z.append(TAU2022_DEVICES[source_label])
+        loop.set_description('从audio文件读取数据集...')
+    print('制作h5数据集中(类别:{})，可能需要数分钟时间...'.format(scene_class))
+
+    with h5py.File(h5_path_per_class, 'a') as f:
+        f.create_dataset('data', data=X)
+        f.create_dataset('label', data=Y)
+        f.create_dataset('device', data=Z)
+    print('制作h5数据集完成，保存至 {}'.format(h5_path_per_class))
+
+
 # 获取原版tau2022数据集
 def get_tau2022(mel=False):
     train_h5 = os.path.join(H5PATH, 'tau2022_train.h5')
@@ -150,16 +186,28 @@ def get_tau2022_reassembled_random_slicing(mel=False):
     return train, test
 
 
+def get_valset():
+    valset_list = {}
+    for k in TAU2022_CLASSES.keys():
+        test_h5 = os.path.join(dataset_config['h5path'], 'tau2022_test_{}.h5'.format(k))
+        valset_list[k] = DataLoader(TAU2022(test_h5), batch_size=dataset_config['batch_size'], shuffle=False)
+    return valset_list
+
+
 if __name__ == '__main__':
-    '''
+
     train_h5 = os.path.join(H5PATH, 'tau2022_train.h5')
     test_h5 = os.path.join(H5PATH, 'tau2022_test.h5')
     train_csv = os.path.split(META_PATH)[0] + '/evaluation_setup/fold1_train.csv'
     test_csv = os.path.split(META_PATH)[0] + '/evaluation_setup/fold1_evaluate.csv'
-    make_tau2022(train_csv, train_h5, reassembled=False)
-    make_tau2022(test_csv, test_h5, reassembled=False)
-    '''
+    # make_tau2022_per_class(train_csv, train_h5, scene_class='airport', reassembled=False)
+    for k in TAU2022_CLASSES.keys():
+        try:
+            make_tau2022_per_class(test_csv, test_h5, scene_class=k, reassembled=False)
+        except:
+            pass
 
+    '''
     # 原版TAU2022数据集调用
     TAU2022_train, TAU2022_test = get_tau2022()
     i = 0
@@ -173,6 +221,7 @@ if __name__ == '__main__':
         # print(x)
         # print(y)
         i += 1
+    '''
     '''
     # TAU2022_reassembled数据集调用
     TAU2022_reassembled_train, TAU2022_reassembled_test = get_tau2022_reassembled()

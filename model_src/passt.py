@@ -9,8 +9,8 @@ from model_src.module.mixstyle import MixStyle
 
 
 def get_model_wrapper(n_classes, **kwargs):
-    mel = AugmentMelSTFT(n_mels=128, sr=32000, win_length=800, hopsize=320, n_fft=1024, freqm=0,
-                         timem=0,
+    mel = AugmentMelSTFT(n_mels=128, sr=32000, win_length=800, hopsize=320, n_fft=1024, freqm=48,
+                         timem=20,
                          htk=False, fmin=0.0, fmax=None, norm=1, fmin_aug_range=1,
                          fmax_aug_range=1)
     '''
@@ -100,6 +100,20 @@ def passt(mixstyle_conf, pretrained_local=True, n_classes=10):
     else:
         model.net = passt
     model.train()
+    return model
+
+
+def passt_10s(weights_path, n_classes=10):
+    mel = AugmentMelSTFT(n_mels=128, sr=32000, win_length=800, hopsize=320, n_fft=1024, freqm=0,
+                         timem=0,
+                         htk=False, fmin=0.0, fmax=None, norm=1, fmin_aug_range=1,
+                         fmax_aug_range=1)
+    net = get_model_passt(arch="passt_s_swa_p16_128_ap476", pretrained=False, fstride=10,
+                          tstride=10, n_classes=n_classes)
+    weights = torch.load(weights_path)
+    model = PasstBasicWrapper(mel=mel, net=net)
+    model.net.load_state_dict(weights)
+
     return model
 
 
