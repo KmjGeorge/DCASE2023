@@ -3,6 +3,7 @@ import math
 import torch
 import torch.nn as nn
 from einops import rearrange
+from torch.jit.quantized import QuantizedLinear
 from torch.utils.data import DataLoader
 from torch.nn import functional as F
 from dataset.datagenerator import TAU2022
@@ -74,7 +75,7 @@ class PreNorm_RFN(nn.Module):
     def forward(self, x, **kwargs):
         return self.fn(self.norm(x), **kwargs)
 
-'''
+
 class FeedForward(nn.Module):
     def __init__(self, dim, hidden_dim, dropout=0.):
         super().__init__()
@@ -112,6 +113,7 @@ class FeedForward_conv(nn.Module):
         x = rearrange(x, 'b w c h -> b c h w')
         return x
 
+
 class Attention(nn.Module):
     def __init__(self, dim, heads=8, dim_head=64, dropout=0.):
         super().__init__()
@@ -131,15 +133,71 @@ class Attention(nn.Module):
 
     def forward(self, x):
         qkv = self.to_qkv(x).chunk(3, dim=-1)
-        q, k, v = map(lambda t: rearrange(t, 'b p n (h d) -> b p h n d', h=self.heads), qkv)
+        shape = qkv[0].shape
+        b = shape[0]
+        p = shape[1]
+        n = shape[2]
+        h = self.heads
+        d = shape[3] // h
+        q = qkv[0].reshape(b, p, h, n, d)
+        k = qkv[1].reshape(b, p, h, n, d)
+        v = qkv[2].reshape(b, p, h, n, d)
+        # q, k, v = map(lambda t: rearrange(t, 'b p n (h d) -> b p h n d', h=self.heads), qkv)
 
         kt = k.transpose(-1, -2)
         dots = torch.matmul(q, kt) * self.scale
         attn = self.attend(dots)
         out = torch.matmul(attn, v)
-        out = rearrange(out, 'b p h n d -> b p n (h d)')
+        out = out.reshape(b, p, n, h * d)
         return self.to_out(out)
-        
+
+
+class Attention_Manual(nn.Module):
+    def __init__(self, dim, heads=8, dim_head=64, dropout=0.):
+        super().__init__()
+        inner_dim = dim_head * heads
+        self.dim = dim
+        # print('innder dim=', inner_dim)
+        self.heads = heads
+        self.scale = dim_head ** -0.5
+        self.dropout = dropout
+        self.attend = nn.Softmax(dim=-1)
+        self.to_qkv = nn.Linear(dim, inner_dim * 3, bias=False)
+
+        self.to_out = nn.Linear(inner_dim, dim)
+
+    def forward(self, x):
+        shape = x.shape
+        # x = rearrange(x, 'b c h w -> (b c) h w')
+        x = x.view(shape[0] * shape[1], shape[2], shape[3])
+        attn, _ = F.multi_head_attention_forward(
+            query=x,
+            key=x,
+            value=x,
+            embed_dim_to_check=self.dim,
+            num_heads=self.heads,
+            in_proj_weight=None,
+            in_proj_bias=None,
+            bias_k=None,
+            bias_v=None,
+            add_zero_attn=False,
+            dropout_p=self.dropout,
+            out_proj_weight=self.to_out.weight,
+            out_proj_bias=self.to_out.bias,
+            training=self.training,
+            need_weights=False,
+            use_separate_proj_weight=True,
+            q_proj_weight=self.to_qkv.weight[: self.dim, ...],
+            k_proj_weight=self.to_qkv.weight[
+                          self.dim: 2 * self.dim, ...
+                          ],
+            v_proj_weight=self.to_qkv.weight[2 * self.dim:, ...],
+        )
+        # out = rearrange(attn, '(b c) h w -> b c h w', c=self.heads)
+        out = attn.view(shape)
+        return out
+
+
 class Attention_Conv(nn.Module):
     def __init__(self, dim, heads=8, dim_head=64, dropout=0.):
         super().__init__()
@@ -170,6 +228,7 @@ class Attention_Conv(nn.Module):
         out = rearrange(out, 'b c h w -> b h w c')
         return out
 
+
 class Transformer(nn.Module):
     def __init__(self, dim, depth, heads, mlp_dim, ff_dropout=0., attn_dropout=0.):
         super().__init__()
@@ -178,8 +237,10 @@ class Transformer(nn.Module):
         for _ in range(depth):
             self.layers.append(nn.Sequential(
                 nn.LayerNorm(dim),
+                # RFN(lamb=0.5),
                 Attention(dim=dim, heads=heads, dim_head=dim_head, dropout=attn_dropout),
                 nn.LayerNorm(dim),
+                # RFN(lamb=0.5),
                 FeedForward(dim, mlp_dim, ff_dropout)
             ))
         self.floatfunc = FloatFunctional()
@@ -195,9 +256,9 @@ class Transformer(nn.Module):
             x = layer[2](x)
             x = self.floatfunc.add(layer[3](x), x)
         return x
+
+
 '''
-
-
 class TransformerEncoder(nn.Module):
     def __init__(self, dim, heads, mlp_dim, attn_dropout=0., ff_dropout=0.):
         super().__init__()
@@ -215,7 +276,6 @@ class TransformerEncoder(nn.Module):
             nn.Dropout(p=ff_dropout),
         )
         self.head = heads
-
         self.floatfunc = FloatFunctional()
 
     def fuse_model(self):
@@ -260,6 +320,7 @@ class Transformer(nn.Module):
             x = layer(x)
         x = self.norm(x)
         return x
+'''
 
 
 class MV2Block(nn.Module):
@@ -417,25 +478,23 @@ class MobileASTBlockv3(nn.Module):
         x = self.floatfunc.add(x, y1)
         return x
 
-    '''
-    def forward(self, x):
-        y1 = x.clone()
-
-        x = self.point_conv(self.depth_conv(x))
-        y2 = x.clone()
-
-        _, _, h, w = x.shape
-        x = rearrange(x, 'b d (h ph) (w pw) -> b (ph pw) (h w) d', ph=self.ph, pw=self.pw)
-        x = self.transformer(x)
-        x = rearrange(x, 'b (ph pw) (h w) d -> b d (h ph) (w pw)', h=h // self.ph, w=w // self.pw, ph=self.ph,
-                      pw=self.pw)
-
-        x = self.conv3(x)
-        x = self.floatfunc.cat([x, y2], 1)
-        x = self.conv4(x)
-        x = self.floatfunc.add(x, y1)
-        return x
-    '''
+    # def forward(self, x):
+    #     y1 = x.clone()
+    #
+    #     x = self.point_conv(self.depth_conv(x))
+    #     y2 = x.clone()
+    #
+    #     _, _, h, w = x.shape
+    #     x = rearrange(x, 'b d (h ph) (w pw) -> b (ph pw) (h w) d', ph=self.ph, pw=self.pw)
+    #     x = self.transformer(x)
+    #     x = rearrange(x, 'b (ph pw) (h w) d -> b d (h ph) (w pw)', h=h // self.ph, w=w // self.pw, ph=self.ph,
+    #                   pw=self.pw)
+    #
+    #     x = self.conv3(x)
+    #     x = self.floatfunc.cat([x, y2], 1)
+    #     x = self.conv4(x)
+    #     x = self.floatfunc.add(x, y1)
+    #     return x
 
 
 class MobileASTBlock(nn.Module):
@@ -597,7 +656,7 @@ class MobileAST_Light2_Quant(nn.Module):
         return x
 
 
-class MobileAST_Light2(nn.Module):
+class MobileAST_Light2_Small(nn.Module):
     def __init__(self, spec_size, num_classes, kernel_size=(3, 3), patch_size=(2, 2),
                  ):
         super().__init__()
@@ -614,74 +673,14 @@ class MobileAST_Light2(nn.Module):
         self.fmaxpool = nn.MaxPool2d(kernel_size=(2, 1))
         self.mvit_1 = MobileASTBlockv3(dim=32, heads=4, depth=2, channel=32, kernel_size=kernel_size,
                                        patch_size=patch_size, mlp_dim=32)
-        self.mv2_3 = MV2Block(32, 64, 2, expansion=2)
-        self.mvit_2 = MobileASTBlockv3(dim=32, heads=4, depth=4, channel=64, kernel_size=kernel_size,
-                                       patch_size=patch_size, mlp_dim=64)
-        self.conv2 = conv_1x1_bn(64, 200)
+        self.mv2_3 = MV2Block(32, 64, 2, expansion=1)
+        # self.mvit_2 = MobileASTBlockv3(dim=32, heads=4, depth=4, channel=64, kernel_size=kernel_size,
+        #                                patch_size=patch_size, mlp_dim=64)
+        self.conv2 = conv_1x1_bn(64, 128)
 
-        self.pool = nn.AvgPool2d((16, 8), 1)
-        self.fc = nn.Linear(200, num_classes, bias=False)
+        # self.pool = nn.AvgPool2d((16, 8), 1)
+        # self.fc = nn.Linear(200, num_classes, bias=False)
 
-        # self.feed_forward = nn.Sequential(
-        #     nn.Conv2d(
-        #         128,
-        #         num_classes,
-        #         kernel_size=1,
-        #         stride=1,
-        #         padding=0,
-        #         bias=False),
-        #     nn.BatchNorm2d(num_classes),
-        #     nn.AdaptiveAvgPool2d((1, 1))
-        # )
-
-    def fuse_model(self):
-        fuse_modules(self.conv1, ['0', '1', '2'], inplace=True)
-        self.mv2_1.fuse_model()
-        self.mv2_2.fuse_model()
-        self.mv2_3.fuse_model()
-        self.mvit_1.fuse_model()
-        self.mvit_2.fuse_model()
-        fuse_modules(self.conv2, ['0', '1', '2'], inplace=True)
-
-    def forward(self, x):
-        x = self.quant(x)
-
-        x = self.conv1(x)
-        x = self.mv2_1(x)
-        x = self.mv2_2(x)
-        x = self.fmaxpool(x)
-
-        x = self.mvit_1(x)
-        x = self.mv2_3(x)
-        x = self.mvit_2(x)
-
-        x = self.conv2(x)
-        # x = self.feed_forward(x)
-        x = self.pool(x)
-        x = x.view(-1, x.shape[1])
-        x = self.fc(x)
-        x = self.dequant(x)
-        return x
-
-
-class MobileAST_Light3(nn.Module):
-    def __init__(self, spec_size, num_classes, kernel_size=(3, 3), patch_size=(2, 2),
-                 ):
-        super().__init__()
-
-        ih, iw = spec_size[0], spec_size[1]
-        ph, pw = patch_size[0], patch_size[1]
-        assert ih % ph == 0 and iw % pw == 0
-        self.quant = QuantStub()
-        self.dequant = DeQuantStub()
-        self.conv1 = conv_nxn_bn(1, 32, stride=2)
-        self.fmaxpool = nn.MaxPool2d(kernel_size=(2, 1))
-        self.mvit_1 = MobileASTBlockv3(dim=32, heads=4, depth=2, channel=32, kernel_size=kernel_size,
-                                        patch_size=patch_size, mlp_dim=64)
-        self.conv2 = conv_nxn_bn(32, 64, stride=2)
-        self.mvit_2 = MobileASTBlockv3(dim=48, heads=4, depth=4, channel=64, kernel_size=kernel_size,
-                                        patch_size=patch_size, mlp_dim=64)
-        self.conv3 = conv_1x1_bn(64, 128)
         self.feed_forward = nn.Sequential(
             nn.Conv2d(
                 128,
@@ -696,32 +695,169 @@ class MobileAST_Light3(nn.Module):
 
     def fuse_model(self):
         fuse_modules(self.conv1, ['0', '1', '2'], inplace=True)
-        fuse_modules(self.conv2, ['0', '1', '2'], inplace=True)
         self.mv2_1.fuse_model()
         self.mv2_2.fuse_model()
         self.mv2_3.fuse_model()
         self.mvit_1.fuse_model()
-        self.mvit_2.fuse_model()
-        fuse_modules(self.feed_forward, ['0', '1'], inplace=True)
+        # self.mvit_2.fuse_model()
+        fuse_modules(self.conv2, ['0', '1', '2'], inplace=True)
 
     def forward(self, x):
         x = self.quant(x)
 
         x = self.conv1(x)
+        x = self.mv2_1(x)
+        x = self.mv2_2(x)
         x = self.fmaxpool(x)
 
         x = self.mvit_1(x)
-        x = self.conv2(x)
-        x = self.mvit_2(x)
+        x = self.mv2_3(x)
+        # x = self.mvit_2(x)
 
-        x = self.conv3(x)
-        x = self.feed_forward(x)
+        x = self.conv2(x)
+
         # x = self.pool(x)
         # x = x.view(-1, x.shape[1])
         # x = self.fc(x)
-
-        x = self.dequant(x)
+        x = self.feed_forward(x)
         x = x.squeeze(2).squeeze(2)
+        x = self.dequant(x)
+
+        return x
+
+
+class MobileAST_Light2(nn.Module):
+    def __init__(self, spec_size, num_classes, kernel_size=(3, 3), patch_size=(2, 2),
+                 ):
+        super().__init__()
+
+        ih, iw = spec_size[0], spec_size[1]
+        ph, pw = patch_size[0], patch_size[1]
+        assert ih % ph == 0 and iw % pw == 0
+        self.quant = QuantStub()
+        self.dequant = DeQuantStub()
+        self.conv1 = conv_nxn_bn(1, 32, stride=2)
+        self.mv2_1 = MV2Block(32, 32, 1, expansion=2)
+        self.mv2_2 = MV2Block(32, 32, 2, expansion=1)
+
+        self.fmaxpool = nn.MaxPool2d(kernel_size=(2, 1))
+        self.mvit_1 = MobileASTBlockv3(dim=32, heads=4, depth=2, channel=32, kernel_size=kernel_size,
+                                       patch_size=patch_size, mlp_dim=64)
+        self.mv2_3 = MV2Block(32, 64, 2, expansion=2)
+        # self.mvit_2 = MobileASTBlockv3(dim=32, heads=4, depth=4, channel=64, kernel_size=kernel_size,
+        #                                patch_size=patch_size, mlp_dim=32)
+        self.conv2 = conv_1x1_bn(64, 200)
+        self.pool = nn.AvgPool2d((16, 8), 1)
+        self.fc = nn.Linear(200, num_classes, bias=False)
+        # self.feed_forward = nn.Sequential(
+        #     nn.Conv2d(
+        #         128,
+        #         num_classes,
+        #         kernel_size=1,
+        #         stride=1,
+        #         padding=0,
+        #         bias=False),
+        #     nn.BatchNorm2d(num_classes),
+        #     nn.AdaptiveAvgPool2d((1, 1))
+        # )
+
+    def fuse_model(self):
+        fuse_modules(self.conv1, ['0', '1', '2'], inplace=True)
+        fuse_modules(self.conv2, ['0', '1', '2'], inplace=True)
+        self.mv2_1.fuse_model()
+        self.mv2_2.fuse_model()
+        self.mv2_3.fuse_model()
+        self.mvit_1.fuse_model()
+        # self.mvit_2.fuse_model()
+        # fuse_modules(self.feed_forward, ['0', '1'], inplace=True)
+
+    def forward(self, x):
+        x = self.quant(x)
+
+        x = self.conv1(x)
+        x = self.mv2_1(x)
+        x = self.mv2_2(x)
+        x = self.fmaxpool(x)
+        x = self.mvit_1(x)
+        x = self.mv2_3(x)
+        # x = self.mvit_2(x)
+        x = self.conv2(x)
+        # x = self.feed_forward(x)
+        x = self.pool(x)
+        x = x.view(-1, x.shape[1])
+        x = self.fc(x)
+        x = self.dequant(x)
+
+        return x
+
+
+class Test(nn.Module):
+    def __init__(self, spec_size, num_classes, kernel_size=(3, 3), patch_size=(2, 2),
+                 ):
+        super().__init__()
+
+        ih, iw = spec_size[0], spec_size[1]
+        ph, pw = patch_size[0], patch_size[1]
+        assert ih % ph == 0 and iw % pw == 0
+        self.quant = QuantStub()
+        self.dequant = DeQuantStub()
+        self.conv1 = conv_nxn_bn(1, 32, stride=2)
+
+        self.mv2_1 = MV2Block(32, 32, 1, expansion=2)
+        self.mv2_2 = MV2Block(32, 32, 2, expansion=1)
+        self.fmaxpool = nn.MaxPool2d(kernel_size=(2, 1))
+        # self.mvit_1 = MobileASTBlockv3(dim=32, heads=4, depth=2, channel=32, kernel_size=kernel_size,
+        #                                patch_size=patch_size, mlp_dim=32)
+        self.mv2_3 = MV2Block(32, 64, 2, expansion=1)
+        # self.mvit_2 = MobileASTBlockv3(dim=32, heads=4, depth=4, channel=64, kernel_size=kernel_size,
+        #                                patch_size=patch_size, mlp_dim=64)
+        self.conv2 = conv_1x1_bn(64, 128)
+
+        # self.pool = nn.AvgPool2d((16, 8), 1)
+        # self.fc = nn.Linear(200, num_classes, bias=False)
+
+        self.feed_forward = nn.Sequential(
+            nn.Conv2d(
+                128,
+                num_classes,
+                kernel_size=1,
+                stride=1,
+                padding=0,
+                bias=False),
+            nn.BatchNorm2d(num_classes),
+            nn.AdaptiveAvgPool2d((1, 1))
+        )
+
+    def fuse_model(self):
+        fuse_modules(self.conv1, ['0', '1', '2'], inplace=True)
+        self.mv2_1.fuse_model()
+        self.mv2_2.fuse_model()
+        self.mv2_3.fuse_model()
+        # self.mvit_1.fuse_model()
+        # self.mvit_2.fuse_model()
+        fuse_modules(self.conv2, ['0', '1', '2'], inplace=True)
+
+    def forward(self, x):
+        x = self.quant(x)
+
+        x = self.conv1(x)
+        x = self.mv2_1(x)
+        x = self.mv2_2(x)
+        x = self.fmaxpool(x)
+
+        # x = self.mvit_1(x)
+        x = self.mv2_3(x)
+        # x = self.mvit_2(x)
+
+        x = self.conv2(x)
+
+        # x = self.pool(x)
+        # x = x.view(-1, x.shape[1])
+        # x = self.fc(x)
+        x = self.feed_forward(x)
+        x = x.squeeze(2).squeeze(2)
+        x = self.dequant(x)
+
         return x
 
 
@@ -895,14 +1031,16 @@ class MobileAST_Light_CPResNet(nn.Module):
 
 
 class MobileAST_Light_CPResNet2(nn.Module):
-    def __init__(self, spec_size, num_classes, kernel_size=(3, 3), patch_size=(2, 2), da_train=False):
+    def __init__(self, spec_size, num_classes, kernel_size=(3, 3), patch_size=(2, 2)):
         super().__init__()
 
         ih, iw = spec_size[0], spec_size[1]
         ph, pw = patch_size[0], patch_size[1]
         assert ih % ph == 0 and iw % pw == 0
+
         self.quant = QuantStub()
         self.dequant = DeQuantStub()
+
         self.input_c = nn.Sequential(nn.Conv2d(
             in_channels=1,
             out_channels=32,
@@ -914,18 +1052,18 @@ class MobileAST_Light_CPResNet2(nn.Module):
             nn.ReLU(True)
         )
 
-        self.stage1 = _make_stage(in_channels=32, out_channels=32, n_blocks=1, block=CPBlock, k1s=[3, 1], k2s=[3, 1],
+        self.stage1 = _make_stage(in_channels=32, out_channels=32, n_blocks=1, block=CPBlock, k1s=[3, 3], k2s=[1, 1],
                                   maxpool=[0, 1], groups=1)
 
-        self.mvit_1 = MobileASTBlockv3(dim=32, depth=2, heads=4, channel=32, kernel_size=kernel_size,
+        self.mvit_1 = MobileASTBlockv3(dim=32, heads=4, depth=2, channel=32, kernel_size=kernel_size,
                                        patch_size=patch_size,
                                        mlp_dim=64)
 
-        self.mvit_2 = MobileASTBlockv3(dim=32, depth=2, heads=4, channel=32, kernel_size=kernel_size,
-                                       patch_size=patch_size,
-                                       mlp_dim=64)
+        self.conv = conv_nxn_bn(32, 64, stride=2)
 
-        self.conv = conv_nxn_bn(32, 64, kernal_size=3, stride=2)
+        # self.mvit_2 = MobileASTBlockv3(dim=32, heads=4, depth=1, channel=64, kernel_size=kernel_size,
+        #                                patch_size=patch_size,
+        #                                mlp_dim=32)
 
         self.stage2 = _make_stage(in_channels=64, out_channels=64, n_blocks=1, block=CPBlock, maxpool=[],
                                   k1s=[1, 1], k2s=[1, 1],
@@ -943,29 +1081,6 @@ class MobileAST_Light_CPResNet2(nn.Module):
             nn.AdaptiveAvgPool2d((1, 1))
         )
 
-        self.da_train = da_train
-
-        if self.da_train:
-            self.feed_forward_device = nn.Sequential(
-                GRL(alpha=1),
-                nn.Conv2d(
-                    64,
-                    64,
-                    kernel_size=1,
-                    stride=1,
-                    padding=0,
-                    bias=False),
-                nn.Conv2d(
-                    64,
-                    2,
-                    kernel_size=1,
-                    stride=1,
-                    padding=0,
-                    bias=False),
-                nn.BatchNorm2d(2),
-                nn.AdaptiveAvgPool2d((1, 1))
-            )
-
     def fuse_model(self):
         fuse_modules(self.input_c, ['0', '1', '2'], inplace=True)
         fuse_modules(self.stage1[1], [['conv1', 'bn1', 'relu1'], ['conv2', 'bn2', 'relu2']], inplace=True)
@@ -980,19 +1095,14 @@ class MobileAST_Light_CPResNet2(nn.Module):
         x = self.input_c(x)
         x = self.stage1(x)
         x = self.mvit_1(x)
-
-        x = self.mvit_2(x)
         x = self.conv(x)
+        # x = self.mvit_2(x)
         x = self.stage2(x)
         # print(x.shape)
         x = self.feed_forward(x)
         x = self.dequant(x)
         x_class = x.squeeze(2).squeeze(2)
-        if self.da_train:
-            x_device = self.feed_forward_device(x).squeeze(2).squeeze(2)
-            return x_class, x_device
-        else:
-            return x_class
+        return x_class
 
 
 def mobileast_light(mixstyle_conf):
@@ -1063,53 +1173,60 @@ if __name__ == '__main__':
     import copy
     from model_src.cp_resnet import cp_resnet
 
+    input_shape = (1, 1, 256, 64)
+    # model_fp32 = Test((256, 64), num_classes=10, kernel_size=(3, 3), patch_size=(2, 2))
+
     model_fp32 = MobileAST_Light2((256, 64), num_classes=10, kernel_size=(3, 3), patch_size=(2, 2))
+    torch.save(model_fp32.state_dict(), '../123.pt')
+    # model_fp32 = mobileast_light2(mixstyle_config)
     # model_fp32 = MobileASTBlockv3(dim=32, heads=4, depth=2, channel=32, kernel_size=(3, 3),
-    #                                patch_size=(2, 2), mlp_dim=32)
+    #                               patch_size=(2, 2), mlp_dim=32)
     # model_fp32 = Transformer(dim=32, depth=2, heads=4, mlp_dim=32)
     # nessi.get_model_size(model_fp32, 'torch', input_size=(1, 1, 256, 64))
+    # assert False
     # model_fp32 = cp_resnet(mixstyle_config, rho=8, cut_channels_s3=36, s2_group=2, n_blocks=(2, 1, 1))
     model_fp32.eval()
     print_size_of_model(model_fp32)
-
-    # ptsq
+    input_fp32 = torch.rand(input_shape)
     '''
+    # ptsq
     model_fp32.fuse_model()
     model_fp32.qconfig = torch.ao.quantization.get_default_qconfig('fbgemm')
     model_fp32_prepared = torch.ao.quantization.prepare(model_fp32)
-    
 
     # tau2022_random_slicing_test = TAU2022('../dataset/h5/tau2022_test.h5', mel=True)
     # calibration_set = DataLoader(tau2022_random_slicing_test, batch_size=64, shuffle=False)
     # for i, (x, _, _) in enumerate(calibration_set):
     #     x = x.to('cpu')
-    #     if i == 5:
+    #     if i == 50:
     #         break
     #     model_fp32_prepared(x)
     # print('校准完成')
 
-    model_int8_ptsq = torch.ao.quantization.convert(model_fp32_prepared)
-    print_size_of_model(model_int8_ptsq)
+    model_int8 = torch.ao.quantization.convert(model_fp32_prepared)
+    print_size_of_model(model_int8)
     '''
 
     # fx
     model_to_quantize = copy.deepcopy(model_fp32)
     qconfig_mapping = get_default_qconfig_mapping("fbgemm")
-    input_fp32 = torch.rand(1, 1, 256, 64)
     example_inputs = (input_fp32)
     model_fp32_prepared = quantize_fx.prepare_fx(model_to_quantize, qconfig_mapping, example_inputs)
     model_int8 = quantize_fx.convert_fx(model_fp32_prepared)
     print_size_of_model(model_int8)
+
     rlt = model_int8(input_fp32)
     print(rlt)
 
+    '''
     for (k1, v1), (k2, v2) in zip(model_fp32.state_dict().items(), model_int8.state_dict().items()):
         try:
             print(k1, v1.type(), v2.type(), v1.type() == v2.type())
         except:
             pass
+    '''
 
-    nessi.get_model_size(model_fp32, 'torch', input_size=(1, 1, 256, 64))
-    nessi.get_model_size(model_fp32_prepared, 'torch', input_size=(1, 1, 256, 64))
+    nessi.get_model_size(model_fp32, 'torch', input_size=input_shape)
+    nessi.get_model_size(model_fp32_prepared, 'torch', input_size=input_shape)
 
     # nessi.get_model_size(model_int8_ptsq, 'torch', input_size=(1, 1, 256, 64))

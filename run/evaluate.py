@@ -36,9 +36,12 @@ if __name__ == '__main__':
     setup_seed(200)
     from dataset.datagenerator import get_valset
     from model_src.mobilevit import mobileast_light2
+    import model_src.quant_mobilevit
     from dataset.spectrum import ExtractMel
-    model = nn.Sequential(ExtractMel(**spectrum_config), mobileast_light2(mixstyle_config)).to(device)
-    weight_path = '../model_weights/best/passt+mobileastv3_Light2 DKD T=4 alpha=2 beta=8 MixStyle(0.3 0.8) Mixup(0.3 1) timerolling dkd T=2, alpha=2, beta=8_60.37.pt'
+    from size_cal import nessi
+    model = nn.Sequential(ExtractMel(**spectrum_config), model_src.quant_mobilevit.mobileast_cpresnet2(mixstyle_config)).to(device)
+    nessi.get_model_size(model, 'torch', (1, 32000))
+    weight_path = '../model_weights/best/passt+mobileastv3_cpresnet2 small DKD T=4 alpha=1 beta=10 MixStyle(0.3 0.6) Mixup(0.3 1) _54.63.pt'
     model.load_state_dict(torch.load(weight_path))
     test_dataloader_list = get_valset()
 
