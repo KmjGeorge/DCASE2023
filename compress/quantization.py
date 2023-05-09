@@ -14,14 +14,14 @@ from size_cal import nessi
 
 
 # 量化
-def quantization(model_fp32, mode, calibration_set=None, show=True, observer='x86'):
+def quantization(model_fp32, mode, calibration_set=None, show=True, backend='x86'):
     model_fp32.cpu()
     model_fp32.eval()
     print('original:', end=' ')
     print_size_of_model(model_fp32)
 
     if mode == 'ptsq':
-        model_fp32.qconfig = torch.ao.quantization.get_default_qconfig(observer)
+        model_fp32.qconfig = torch.ao.quantization.get_default_qconfig(backend)
         model_fp32.fuse_model()
         model_fp32_prepared = torch.ao.quantization.prepare(model_fp32)
         if show:
@@ -37,7 +37,7 @@ def quantization(model_fp32, mode, calibration_set=None, show=True, observer='x8
         print_size_of_model(model_int8)
     elif mode == 'fx':
         model_to_quantize = copy.deepcopy(model_fp32)
-        qconfig_mapping = get_default_qconfig_mapping(observer)
+        qconfig_mapping = get_default_qconfig_mapping(backend)
         input_fp32 = torch.rand(1, 1, 256, 64)
         example_inputs = (input_fp32)
         model_fp32_prepared = quantize_fx.prepare_fx(model_to_quantize, qconfig_mapping, example_inputs)
@@ -63,4 +63,4 @@ def print_size_of_model(model, label=""):
 if __name__ == '__main__':
     mixstyle_conf = {'enable': False}
     model = model_src.cp_resnet.cp_resnet(mixstyle_conf, rho=7, s2_group=2, cut_channels_s3=24, n_blocks=(2, 1, 1))
-    model_int8 = quantization(model, 'ptsq', observer='x86')
+    model_int8 = quantization(model, 'ptsq', backend='x86')

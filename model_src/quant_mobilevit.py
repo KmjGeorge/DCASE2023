@@ -56,6 +56,7 @@ def conv_nxn_ssn(inp, oup, S, kernal_size=3, stride=1):
     )
 
 
+'''
 class PreNorm(nn.Module):
     def __init__(self, dim, fn):
         super().__init__()
@@ -75,6 +76,8 @@ class PreNorm_RFN(nn.Module):
     def forward(self, x, **kwargs):
         return self.fn(self.norm(x), **kwargs)
 
+'''
+
 
 class FeedForward(nn.Module):
     def __init__(self, dim, hidden_dim, dropout=0.):
@@ -92,26 +95,6 @@ class FeedForward(nn.Module):
 
     def forward(self, x):
         return self.net(x)
-
-
-class FeedForward_conv(nn.Module):
-    def __init__(self, dim, hidden_dim, dropout=0.):
-        super().__init__()
-        self.dim = dim
-        self.net = nn.Sequential(
-            nn.Conv2d(dim, hidden_dim, kernel_size=1),
-            nn.ReLU(True),
-            nn.Conv2d(hidden_dim, dim, kernel_size=1),
-        )
-
-    def fuse_model(self):
-        fuse_modules(self.net, [['0', '1']], inplace=True)
-
-    def forward(self, x):
-        x = rearrange(x, 'b c h w -> b w c h')
-        x = self.net(x)
-        x = rearrange(x, 'b w c h -> b c h w')
-        return x
 
 
 class Attention(nn.Module):
@@ -144,14 +127,14 @@ class Attention(nn.Module):
         v = qkv[2].reshape(b, p, h, n, d)
         # q, k, v = map(lambda t: rearrange(t, 'b p n (h d) -> b p h n d', h=self.heads), qkv)
 
-        kt = k.transpose(-1, -2)
-        dots = torch.matmul(q, kt) * self.scale
+        dots = torch.matmul(q, k.transpose(-1, -2)) * self.scale
         attn = self.attend(dots)
         out = torch.matmul(attn, v)
         out = out.reshape(b, p, n, h * d)
         return self.to_out(out)
 
 
+'''
 class Attention_Manual(nn.Module):
     def __init__(self, dim, heads=8, dim_head=64, dropout=0.):
         super().__init__()
@@ -227,6 +210,7 @@ class Attention_Conv(nn.Module):
         out = self.to_out(out)
         out = rearrange(out, 'b c h w -> b h w c')
         return out
+'''
 
 
 class Transformer(nn.Module):
@@ -458,25 +442,29 @@ class MobileASTBlockv3(nn.Module):
         return patches, info_dict
 
     def forward(self, x):
-        y1 = x.clone()
+        res1 = x
 
-        x = self.point_conv(self.depth_conv(x))
-        y2 = x.clone()
+        y1 = self.depth_conv(x)
+        y1 = self.point_conv(y1)
+
+        res2 = y1
 
         _, _, h, w = x.shape
-        patches, info_dict = self.unfolding(x)
+        patches, info_dict = self.unfolding(y1)
         # x = rearrange(x, 'b d (h ph) (w pw) -> b (ph pw) (h w) d', ph=self.ph, pw=self.pw)
 
         patches = self.transformer(patches)
         # x = rearrange(x, 'b (ph pw) (h w) d -> b d (h ph) (w pw)', h=h // self.ph, w=w // self.pw, ph=self.ph,
         #              pw=self.pw)
-        x = self.folding(patches=patches, info_dict=info_dict)
+        y2 = self.folding(patches=patches, info_dict=info_dict)
 
-        x = self.conv3(x)
-        x = self.floatfunc.cat([x, y2], 1)
-        x = self.conv4(x)
-        x = self.floatfunc.add(x, y1)
-        return x
+        y2 = self.conv3(y2)
+        y2 = self.floatfunc.cat([y2, res2], 1)
+        # y2 = torch.cat([y2, res2], dim=1)
+        y2 = self.conv4(y2)
+        y2 = self.floatfunc.add(y2, res1)
+        # y2 = y2 + res1
+        return y2
 
     # def forward(self, x):
     #     y1 = x.clone()
@@ -546,8 +534,8 @@ class MobileAST_Light(nn.Module):
         ih, iw = spec_size[0], spec_size[1]
         ph, pw = patch_size[0], patch_size[1]
         assert ih % ph == 0 and iw % pw == 0
-        self.quant = QuantStub()
-        self.dequant = DeQuantStub()
+        # self.quant = QuantStub()
+        # self.dequant = DeQuantStub()
         self.conv1 = conv_nxn_bn(1, 32, stride=2)
 
         self.mv2_1 = MV2Block(32, 48, 1, expansion=1)
@@ -555,13 +543,13 @@ class MobileAST_Light(nn.Module):
         self.maxpool1 = nn.MaxPool2d(kernel_size=(2, 1))
         # self.mv2_3 = MV2Block_SSN(32, 48, 1, expansion=1)
         # self.mv2_4 = MV2Block_SSN(48, 48, 2, expansion=1)
-        self.mvit_1 = MobileASTBlockv3(dim=48, heads=4, depth=6, channel=48, kernel_size=kernel_size,
+        self.mvit_1 = MobileASTBlockv3(dim=48, heads=4, depth=2, channel=48, kernel_size=kernel_size,
                                        patch_size=patch_size, mlp_dim=64)
 
-        self.conv2 = conv_1x1_bn(48, 300)
+        self.conv2 = conv_1x1_bn(48, 200)
 
         self.pool = nn.AvgPool2d((ih // 8, iw // 4), 1)
-        self.fc = nn.Linear(300, num_classes, bias=False)
+        self.fc = nn.Linear(200, num_classes, bias=False)
 
     def fuse_model(self):
         fuse_modules(self.conv1, ['0', '1', '2'], inplace=True)
@@ -571,7 +559,6 @@ class MobileAST_Light(nn.Module):
         fuse_modules(self.conv2, ['0', '1', '2'], inplace=True)
 
     def forward(self, x):
-        x = self.quant(x)
         x = self.conv1(x)
         x = self.mv2_1(x)
         x = self.mv2_2(x)
@@ -583,146 +570,6 @@ class MobileAST_Light(nn.Module):
         x = self.pool(x)
         x = x.view(-1, x.shape[1])
         x = self.fc(x)
-        x = self.dequant(x)
-        return x
-
-
-class MobileAST_Light2_Quant(nn.Module):
-    def __init__(self, spec_size, num_classes, kernel_size=(3, 3), patch_size=(2, 2),
-                 ):
-        super().__init__()
-
-        ih, iw = spec_size[0], spec_size[1]
-        ph, pw = patch_size[0], patch_size[1]
-        assert ih % ph == 0 and iw % pw == 0
-        self.quant = QuantStub()
-        self.dequant = DeQuantStub()
-        self.conv1 = conv_nxn_bn(1, 32, stride=2)
-
-        self.mv2_1 = MV2Block(32, 32, 1, expansion=2)
-        self.mv2_2 = MV2Block(32, 32, 2, expansion=1)
-        self.fmaxpool = nn.MaxPool2d(kernel_size=(2, 1))
-        self.mvit_1 = MobileASTBlockv3(dim=32, heads=4, depth=2, channel=32, kernel_size=kernel_size,
-                                       patch_size=patch_size, mlp_dim=32)
-        self.mv2_3 = MV2Block(32, 64, 2, expansion=2)
-        self.mvit_2 = MobileASTBlockv3(dim=32, heads=4, depth=4, channel=64, kernel_size=kernel_size,
-                                       patch_size=patch_size, mlp_dim=32)
-        self.conv2 = conv_1x1_bn(64, 96)
-        # self.conv2 = conv_1x1_bn(64, 200)
-
-        # self.pool = nn.AvgPool2d((16, 8), 1)
-        # self.fc = nn.Linear(200, num_classes, bias=False)
-        self.feed_forward = nn.Sequential(
-            nn.Conv2d(
-                96,
-                num_classes,
-                kernel_size=1,
-                stride=1,
-                padding=0,
-                bias=False),
-            nn.BatchNorm2d(num_classes),
-            nn.AdaptiveAvgPool2d((1, 1))
-        )
-
-    def fuse_model(self):
-        fuse_modules(self.conv1, ['0', '1', '2'], inplace=True)
-        self.mv2_1.fuse_model()
-        self.mv2_2.fuse_model()
-        self.mv2_3.fuse_model()
-        self.mvit_1.fuse_model()
-        self.mvit_2.fuse_model()
-        fuse_modules(self.feed_forward, ['0', '1'], inplace=True)
-
-    def forward(self, x):
-        x = self.quant(x)
-
-        x = self.conv1(x)
-        x = self.mv2_1(x)
-        x = self.mv2_2(x)
-        x = self.fmaxpool(x)
-
-        x = self.mvit_1(x)
-        x = self.mv2_3(x)
-        x = self.mvit_2(x)
-
-        x = self.conv2(x)
-        x = self.feed_forward(x)
-        # x = self.pool(x)
-        # x = x.view(-1, x.shape[1])
-        # x = self.fc(x)
-
-        x = self.dequant(x)
-        x = x.squeeze(2).squeeze(2)
-        return x
-
-
-class MobileAST_Light2_Small(nn.Module):
-    def __init__(self, spec_size, num_classes, kernel_size=(3, 3), patch_size=(2, 2),
-                 ):
-        super().__init__()
-
-        ih, iw = spec_size[0], spec_size[1]
-        ph, pw = patch_size[0], patch_size[1]
-        assert ih % ph == 0 and iw % pw == 0
-        self.quant = QuantStub()
-        self.dequant = DeQuantStub()
-        self.conv1 = conv_nxn_bn(1, 32, stride=2)
-
-        self.mv2_1 = MV2Block(32, 32, 1, expansion=2)
-        self.mv2_2 = MV2Block(32, 32, 2, expansion=1)
-        self.fmaxpool = nn.MaxPool2d(kernel_size=(2, 1))
-        self.mvit_1 = MobileASTBlockv3(dim=32, heads=4, depth=2, channel=32, kernel_size=kernel_size,
-                                       patch_size=patch_size, mlp_dim=32)
-        self.mv2_3 = MV2Block(32, 64, 2, expansion=1)
-        # self.mvit_2 = MobileASTBlockv3(dim=32, heads=4, depth=4, channel=64, kernel_size=kernel_size,
-        #                                patch_size=patch_size, mlp_dim=64)
-        self.conv2 = conv_1x1_bn(64, 128)
-
-        # self.pool = nn.AvgPool2d((16, 8), 1)
-        # self.fc = nn.Linear(200, num_classes, bias=False)
-
-        self.feed_forward = nn.Sequential(
-            nn.Conv2d(
-                128,
-                num_classes,
-                kernel_size=1,
-                stride=1,
-                padding=0,
-                bias=False),
-            nn.BatchNorm2d(num_classes),
-            nn.AdaptiveAvgPool2d((1, 1))
-        )
-
-    def fuse_model(self):
-        fuse_modules(self.conv1, ['0', '1', '2'], inplace=True)
-        self.mv2_1.fuse_model()
-        self.mv2_2.fuse_model()
-        self.mv2_3.fuse_model()
-        self.mvit_1.fuse_model()
-        # self.mvit_2.fuse_model()
-        fuse_modules(self.conv2, ['0', '1', '2'], inplace=True)
-
-    def forward(self, x):
-        x = self.quant(x)
-
-        x = self.conv1(x)
-        x = self.mv2_1(x)
-        x = self.mv2_2(x)
-        x = self.fmaxpool(x)
-
-        x = self.mvit_1(x)
-        x = self.mv2_3(x)
-        # x = self.mvit_2(x)
-
-        x = self.conv2(x)
-
-        # x = self.pool(x)
-        # x = x.view(-1, x.shape[1])
-        # x = self.fc(x)
-        x = self.feed_forward(x)
-        x = x.squeeze(2).squeeze(2)
-        x = self.dequant(x)
-
         return x
 
 
@@ -734,8 +581,8 @@ class MobileAST_Light2(nn.Module):
         ih, iw = spec_size[0], spec_size[1]
         ph, pw = patch_size[0], patch_size[1]
         assert ih % ph == 0 and iw % pw == 0
-        self.quant = QuantStub()
-        self.dequant = DeQuantStub()
+        # self.quant = QuantStub()
+        # self.dequant = DeQuantStub()
         self.conv1 = conv_nxn_bn(1, 32, stride=2)
         self.mv2_1 = MV2Block(32, 32, 1, expansion=2)
         self.mv2_2 = MV2Block(32, 32, 2, expansion=1)
@@ -772,7 +619,7 @@ class MobileAST_Light2(nn.Module):
         # fuse_modules(self.feed_forward, ['0', '1'], inplace=True)
 
     def forward(self, x):
-        x = self.quant(x)
+        # x = self.quant(x)
 
         x = self.conv1(x)
         x = self.mv2_1(x)
@@ -786,79 +633,10 @@ class MobileAST_Light2(nn.Module):
         x = self.pool(x)
         x = x.view(-1, x.shape[1])
         x = self.fc(x)
-        x = self.dequant(x)
+        # x = self.dequant(x)
 
         return x
 
-
-class Test(nn.Module):
-    def __init__(self, spec_size, num_classes, kernel_size=(3, 3), patch_size=(2, 2),
-                 ):
-        super().__init__()
-
-        ih, iw = spec_size[0], spec_size[1]
-        ph, pw = patch_size[0], patch_size[1]
-        assert ih % ph == 0 and iw % pw == 0
-        self.quant = QuantStub()
-        self.dequant = DeQuantStub()
-        self.conv1 = conv_nxn_bn(1, 32, stride=2)
-
-        self.mv2_1 = MV2Block(32, 32, 1, expansion=2)
-        self.mv2_2 = MV2Block(32, 32, 2, expansion=1)
-        self.fmaxpool = nn.MaxPool2d(kernel_size=(2, 1))
-        # self.mvit_1 = MobileASTBlockv3(dim=32, heads=4, depth=2, channel=32, kernel_size=kernel_size,
-        #                                patch_size=patch_size, mlp_dim=32)
-        self.mv2_3 = MV2Block(32, 64, 2, expansion=1)
-        # self.mvit_2 = MobileASTBlockv3(dim=32, heads=4, depth=4, channel=64, kernel_size=kernel_size,
-        #                                patch_size=patch_size, mlp_dim=64)
-        self.conv2 = conv_1x1_bn(64, 128)
-
-        # self.pool = nn.AvgPool2d((16, 8), 1)
-        # self.fc = nn.Linear(200, num_classes, bias=False)
-
-        self.feed_forward = nn.Sequential(
-            nn.Conv2d(
-                128,
-                num_classes,
-                kernel_size=1,
-                stride=1,
-                padding=0,
-                bias=False),
-            nn.BatchNorm2d(num_classes),
-            nn.AdaptiveAvgPool2d((1, 1))
-        )
-
-    def fuse_model(self):
-        fuse_modules(self.conv1, ['0', '1', '2'], inplace=True)
-        self.mv2_1.fuse_model()
-        self.mv2_2.fuse_model()
-        self.mv2_3.fuse_model()
-        # self.mvit_1.fuse_model()
-        # self.mvit_2.fuse_model()
-        fuse_modules(self.conv2, ['0', '1', '2'], inplace=True)
-
-    def forward(self, x):
-        x = self.quant(x)
-
-        x = self.conv1(x)
-        x = self.mv2_1(x)
-        x = self.mv2_2(x)
-        x = self.fmaxpool(x)
-
-        # x = self.mvit_1(x)
-        x = self.mv2_3(x)
-        # x = self.mvit_2(x)
-
-        x = self.conv2(x)
-
-        # x = self.pool(x)
-        # x = x.view(-1, x.shape[1])
-        # x = self.fc(x)
-        x = self.feed_forward(x)
-        x = x.squeeze(2).squeeze(2)
-        x = self.dequant(x)
-
-        return x
 
 
 def _make_stage(in_channels, out_channels, n_blocks, block, maxpool=None, k1s=(3, 3, 3, 3, 3, 3),
@@ -1176,14 +954,14 @@ if __name__ == '__main__':
     input_shape = (1, 1, 256, 64)
     # model_fp32 = Test((256, 64), num_classes=10, kernel_size=(3, 3), patch_size=(2, 2))
 
-    model_fp32 = MobileAST_Light2((256, 64), num_classes=10, kernel_size=(3, 3), patch_size=(2, 2))
-    torch.save(model_fp32.state_dict(), '../123.pt')
+    model_fp32 = MobileAST_Light((256, 64), num_classes=10, kernel_size=(3, 3), patch_size=(2, 2))
+    # torch.save(model_fp32.state_dict(), '../123.pt')
     # model_fp32 = mobileast_light2(mixstyle_config)
     # model_fp32 = MobileASTBlockv3(dim=32, heads=4, depth=2, channel=32, kernel_size=(3, 3),
     #                               patch_size=(2, 2), mlp_dim=32)
     # model_fp32 = Transformer(dim=32, depth=2, heads=4, mlp_dim=32)
-    # nessi.get_model_size(model_fp32, 'torch', input_size=(1, 1, 256, 64))
-    # assert False
+    nessi.get_model_size(model_fp32, 'torch', input_size=(1, 1, 256, 64))
+    assert False
     # model_fp32 = cp_resnet(mixstyle_config, rho=8, cut_channels_s3=36, s2_group=2, n_blocks=(2, 1, 1))
     model_fp32.eval()
     print_size_of_model(model_fp32)
@@ -1209,7 +987,7 @@ if __name__ == '__main__':
 
     # fx
     model_to_quantize = copy.deepcopy(model_fp32)
-    qconfig_mapping = get_default_qconfig_mapping("fbgemm")
+    qconfig_mapping = get_default_qconfig_mapping("qnnpack")
     example_inputs = (input_fp32)
     model_fp32_prepared = quantize_fx.prepare_fx(model_to_quantize, qconfig_mapping, example_inputs)
     model_int8 = quantize_fx.convert_fx(model_fp32_prepared)
