@@ -87,6 +87,33 @@ class TAU2022(Dataset):
         return audio, label, device
 
 
+class TAU2022_Caliburation(Dataset):
+    """
+    :param slicing: 是否切片（需确保数据集是10s的）
+    :param mel: True返回频谱， False返回波形
+    """
+
+    def __init__(self, h5_path, dataset_size):
+        assert (
+                DATASET_NAME == 'TAU2022' or DATASET_NAME == 'tau2022' or DATASET_NAME == 'TAU2022_RANDOM_SLICING' or DATASET_NAME == 'tau2022_random_slicing'
+                or DATASET_NAME == 'TAU2022_REASSEMBLED' or DATASET_NAME == 'tau2022_reassembled')
+        print('加载校准集...')
+        self.X = []
+        with h5py.File(h5_path, 'r') as f:
+            length = len(f['data'])
+            index = np.random.choice(range(length), dataset_size, replace=False)
+            for i in range(length):
+                if i in index:
+                    self.X.append(f['data'][i])
+
+    def __len__(self):
+        return len(self.X)
+
+    def __getitem__(self, idx):
+        audio = self.X[idx]
+        return audio
+
+
 # 构建tau2022数据集 以h5存储 包括：数据(波形) 类别标签 设备标签
 def make_tau2022(meta_path, h5_path, reassembled=False):
     assert not os.path.exists(h5_path), "文件{}已存在！".format(h5_path)
@@ -191,7 +218,17 @@ def get_valset():
     for k in TAU2022_CLASSES.keys():
         test_h5 = os.path.join(dataset_config['h5path'], 'tau2022_test_{}.h5'.format(k))
         valset_list[k] = DataLoader(TAU2022(test_h5), batch_size=dataset_config['batch_size'], shuffle=False)
+    valset_list['all'] = DataLoader(TAU2022(os.path.join(dataset_config['h5path'], 'tau2022_test.h5')),
+                                    batch_size=dataset_config['batch_size'],
+                                    shuffle=False)
     return valset_list
+
+
+# 用于量化的校准集，为验证集的子集
+def get_calibration_set(length):
+    test_h5 = os.path.join(H5PATH, 'tau2022_test.h5')
+    cal_dataset = TAU2022_Caliburation(test_h5, length)
+    return DataLoader(cal_dataset, batch_size=BATCH_SIZE, shuffle=False)
 
 
 if __name__ == '__main__':
