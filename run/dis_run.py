@@ -67,6 +67,12 @@ def get_model(name, wave=True):
                 device)
         else:
             model = model_src.quant_mobilevit.mobileast_light2(mixstyle_conf=mixstyle_config).to(device)
+    elif name == 'mobileast_light_small':
+        if wave:
+            model = nn.Sequential(ExtractMel(**spectrum_config), model_src.quant_mobilevit.mobileast_light(mixstyle_conf=mixstyle_config)).to(
+                device)
+        else:
+            model = model_src.quant_mobilevit.mobileast_light(mixstyle_conf=mixstyle_config).to(device)
     elif name == 'mobileast_cpresnet2_small':
         if wave:
             model = nn.Sequential(ExtractMel(**spectrum_config), model_src.quant_mobilevit.mobileast_cpresnet2(mixstyle_conf=mixstyle_config)).to(

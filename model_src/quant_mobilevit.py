@@ -545,11 +545,22 @@ class MobileAST_Light(nn.Module):
         # self.mv2_4 = MV2Block_SSN(48, 48, 2, expansion=1)
         self.mvit_1 = MobileASTBlockv3(dim=48, heads=4, depth=2, channel=48, kernel_size=kernel_size,
                                        patch_size=patch_size, mlp_dim=64)
-
-        self.conv2 = conv_1x1_bn(48, 200)
+        self.mv2_3 = MV2Block(48, 64, 1, expansion=1)
+        self.conv2 = conv_1x1_bn(64, 80)
+        # self.feed_forward = nn.Sequential(
+        #     nn.Conv2d(
+        #         80,
+        #         num_classes,
+        #         kernel_size=1,
+        #         stride=1,
+        #         padding=0,
+        #         bias=False),
+        #     nn.BatchNorm2d(num_classes),
+        #     nn.AdaptiveAvgPool2d((1, 1))
+        # )
 
         self.pool = nn.AvgPool2d((ih // 8, iw // 4), 1)
-        self.fc = nn.Linear(200, num_classes, bias=False)
+        self.fc = nn.Linear(80, num_classes, bias=False)
 
     def fuse_model(self):
         fuse_modules(self.conv1, ['0', '1', '2'], inplace=True)
@@ -566,7 +577,10 @@ class MobileAST_Light(nn.Module):
         # x = self.mv2_3(x)
         # x = self.mv2_4(x)
         x = self.mvit_1(x)
+        x = self.mv2_3(x)
         x = self.conv2(x)
+        # x = self.feed_forward(x)
+        # x = x.squeeze(2).squeeze(2)
         x = self.pool(x)
         x = x.view(-1, x.shape[1])
         x = self.fc(x)
@@ -636,7 +650,6 @@ class MobileAST_Light2(nn.Module):
         # x = self.dequant(x)
 
         return x
-
 
 
 def _make_stage(in_channels, out_channels, n_blocks, block, maxpool=None, k1s=(3, 3, 3, 3, 3, 3),
@@ -954,7 +967,7 @@ if __name__ == '__main__':
     input_shape = (1, 1, 256, 64)
     # model_fp32 = Test((256, 64), num_classes=10, kernel_size=(3, 3), patch_size=(2, 2))
 
-    model_fp32 = MobileAST_Light((256, 64), num_classes=10, kernel_size=(3, 3), patch_size=(2, 2))
+    model_fp32 = MobileAST_Light2((256, 64), num_classes=10, kernel_size=(3, 3), patch_size=(2, 2))
     # torch.save(model_fp32.state_dict(), '../123.pt')
     # model_fp32 = mobileast_light2(mixstyle_config)
     # model_fp32 = MobileASTBlockv3(dim=32, heads=4, depth=2, channel=32, kernel_size=(3, 3),
@@ -987,7 +1000,7 @@ if __name__ == '__main__':
 
     # fx
     model_to_quantize = copy.deepcopy(model_fp32)
-    qconfig_mapping = get_default_qconfig_mapping("qnnpack")
+    qconfig_mapping = get_default_qconfig_mapping("fbgemm")
     example_inputs = (input_fp32)
     model_fp32_prepared = quantize_fx.prepare_fx(model_to_quantize, qconfig_mapping, example_inputs)
     model_int8 = quantize_fx.convert_fx(model_fp32_prepared)

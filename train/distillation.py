@@ -194,7 +194,7 @@ def distillation_per_epoch(student, teacher, train_loader, hard_criterion, soft_
             y_ = torch.argmax(y_pred_nomix, dim=1)  # 使用非mixup的数据计算acc
             correct += (y_ == y).sum().item()
             total += y.size(0)
-            total_epoch += 1
+            total_batch += 1
             sum_loss += loss.item()
             running_loss = sum_loss / total_batch
             running_acc = correct / total
