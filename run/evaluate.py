@@ -40,17 +40,21 @@ if __name__ == '__main__':
     import model_src.quant_mobilevit
     from dataset.spectrum import ExtractMel
     from size_cal import nessi
-    model = nn.Sequential(ExtractMel(**spectrum_config), model_src.quant_mobilevit.mobileast_light(mixstyle_config))
+
+    extmel = ExtractMel(**spectrum_config)
+    model = nn.Sequential(extmel, model_src.quant_mobilevit.mobileast_light(mixstyle_config)).to('cpu')
     # nessi.get_model_size(model, 'torch', (1, 32000))
     weight_path = '../model_weights/best/passt+mobileastv3_light1 nomvit2(fc) 1e-3 30 1e-4 400 DKD T=4 alpha=1 beta=10 MixStyle(0.3 0.6) Mixup(0.3 1) _56.54.pt'
     model.load_state_dict(torch.load(weight_path))
-    cal_dataloader = get_calibration_set(length=6400)
-    quant_model = quantization(model, 'fx', cal_dataloader, show=True, backend='x86')
 
+    # fbgemm 6400 all: val_loss=1.347028016738979, val_acc=0.5576819407008087
+    # qnnpack 6400 all: val_loss=1.4878578570767724, val_acc=0.5015835579514825
+    cal_dataloader = get_calibration_set(length=6400)
+
+    quant_model = quantization(model, 'fx', cal_dataloader, show=True, backend='fbgemm')
+    quant_model = nn.Sequential(extmel, quant_model)
     test_dataloader_list = get_valset()
     for scene_class, dataset in test_dataloader_list.items():
-        val_loss, val_acc, test_device_info = validate(quant_model, dataset,
+        val_loss, val_acc, test_device_info = validate(model, dataset,
                                                        criterion=normal_training_config['criterion'], device='cpu')
         print('{}: val_loss={}, val_acc={}'.format(scene_class, val_loss, val_acc))
-
-

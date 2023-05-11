@@ -224,10 +224,10 @@ def get_valset():
     return valset_list
 
 
-# 用于量化的校准集，为验证集的子集
+# 用于量化的校准集，为训练集的子集
 def get_calibration_set(length):
-    test_h5 = os.path.join(H5PATH, 'tau2022_test.h5')
-    cal_dataset = TAU2022_Caliburation(test_h5, length)
+    h5 = os.path.join(H5PATH, 'tau2022_train.h5')
+    cal_dataset = TAU2022_Caliburation(h5, length)
     return DataLoader(cal_dataset, batch_size=BATCH_SIZE, shuffle=False)
 
 

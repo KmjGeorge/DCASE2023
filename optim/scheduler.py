@@ -3,6 +3,7 @@ from torch.optim.lr_scheduler import ReduceLROnPlateau
 import torch
 import numpy as np
 
+
 class GradualWarmupScheduler(_LRScheduler):
     """ Gradually warm-up(increasing) learning rate in optimizer.
     Proposed in 'Accurate, Large Minibatch SGD: Training ImageNet in 1 Hour'.
@@ -107,6 +108,19 @@ def linear_rampdown(rampdown_length, start=0, last_value=0):
     return warpper
 
 
+def cosine_rampdown(rampdown_length, num_epochs):
+    """Cosine rampdown from https://arxiv.org/abs/1608.03983"""
+
+    def warpper(epoch):
+        if epoch >= (num_epochs - rampdown_length):
+            ep = .5 * (epoch - (num_epochs - rampdown_length))
+            return float(.5 * (np.cos(np.pi * ep / rampdown_length) + 1))
+        else:
+            return 1.0
+
+    return warpper
+
+
 def exp_rampdown(rampdown_length, num_epochs):
     """Exponential rampdown from https://arxiv.org/abs/1610.02242"""
 
@@ -140,6 +154,16 @@ def exp_warmup_linear_down(warmup, rampdown_length, start_rampdown, last_value):
     return warpper
 
 
+def exp_warmup_cosine_down(warmup, rampdown_length, num_epochs):
+    rampup = exp_rampup(warmup)
+    rampdown = cosine_rampdown(rampdown_length, num_epochs)
+
+    def warpper(epoch):
+        return rampup(epoch) * rampdown(epoch)
+
+    return warpper
+
+
 def get_scheduler_lambda(warm_up_len, ramp_down_start, ramp_down_len, last_lr_value):
     """
     @param warm_up_len: number of epochs for the lr to reach its maximum value
@@ -152,10 +176,23 @@ def get_scheduler_lambda(warm_up_len, ramp_down_start, ramp_down_len, last_lr_va
     return exp_warmup_linear_down(warm_up_len, ramp_down_len, ramp_down_start, last_lr_value)
 
 
-def ExpWarmupLinearDownScheduler(optimizer, warm_up_len=100, ramp_down_start=250, ramp_down_len=400, last_lr_value=0.005):
+def ExpWarmupLinearDownScheduler(optimizer, warm_up_len=100, ramp_down_start=250, ramp_down_len=400,
+                                 last_lr_value=0.005):
     """
     @param optimizer: optimizer used for training
     @param schedule_mode: scheduling mode of the lr
     @return: updated version of the optimizer with new lr
     """
-    return torch.optim.lr_scheduler.LambdaLR(optimizer, get_scheduler_lambda(warm_up_len, ramp_down_start, ramp_down_len, last_lr_value))
+    return torch.optim.lr_scheduler.LambdaLR(optimizer,
+                                             get_scheduler_lambda(warm_up_len, ramp_down_start, ramp_down_len,
+                                                                  last_lr_value))
+
+
+def ExpWarmupCosineDownScheduler(optimizer, warmup, rampdown_length, num_epochs):
+    """
+    @param optimizer: optimizer used for training
+    @param schedule_mode: scheduling mode of the lr
+    @return: updated version of the optimizer with new lr
+    """
+    return torch.optim.lr_scheduler.LambdaLR(optimizer,
+                                             exp_warmup_cosine_down(warmup, rampdown_length, num_epochs))

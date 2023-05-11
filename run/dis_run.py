@@ -61,24 +61,31 @@ def get_model(name, wave=True):
         else:
             model = get_model_based_on_rho(rho=7, arch='cpresnet_damped', in_channels=1, depth=20, base_channels=128,
                                            n_classes=10).to(device)
-    elif name == 'mobileast_light2_small':
-        if wave:
-            model = nn.Sequential(ExtractMel(**spectrum_config), model_src.quant_mobilevit.mobileast_light2(mixstyle_conf=mixstyle_config)).to(
-                device)
-        else:
-            model = model_src.quant_mobilevit.mobileast_light2(mixstyle_conf=mixstyle_config).to(device)
     elif name == 'mobileast_light_small':
         if wave:
             model = nn.Sequential(ExtractMel(**spectrum_config), model_src.quant_mobilevit.mobileast_light(mixstyle_conf=mixstyle_config)).to(
                 device)
         else:
             model = model_src.quant_mobilevit.mobileast_light(mixstyle_conf=mixstyle_config).to(device)
-    elif name == 'mobileast_cpresnet2_small':
+    elif name == 'mobileast_light2_small':
         if wave:
-            model = nn.Sequential(ExtractMel(**spectrum_config), model_src.quant_mobilevit.mobileast_cpresnet2(mixstyle_conf=mixstyle_config)).to(
+            model = nn.Sequential(ExtractMel(**spectrum_config), model_src.quant_mobilevit.mobileast_light2(mixstyle_conf=mixstyle_config)).to(
                 device)
         else:
-            model = model_src.quant_mobilevit.mobileast_cpresnet2(mixstyle_conf=mixstyle_config).to(device)
+            model = model_src.quant_mobilevit.mobileast_light2(mixstyle_conf=mixstyle_config).to(device)
+
+    elif name == 'mobileast_light3_small':
+        if wave:
+            model = nn.Sequential(ExtractMel(**spectrum_config), model_src.quant_mobilevit.mobileast_light3(mixstyle_conf=mixstyle_config)).to(
+                device)
+        else:
+            model = model_src.quant_mobilevit.mobileast_light3(mixstyle_conf=mixstyle_config).to(device)
+    elif name == 'mobileast_light4_small':
+        if wave:
+            model = nn.Sequential(ExtractMel(**spectrum_config), model_src.quant_mobilevit.mobileast_light4(mixstyle_conf=mixstyle_config)).to(
+                device)
+        else:
+            model = model_src.quant_mobilevit.mobileast_light4(mixstyle_conf=mixstyle_config).to(device)
     else:
         raise '未定义的模型！'
 

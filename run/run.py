@@ -112,15 +112,16 @@ if __name__ == '__main__':
     TASK_NAME = normal_training_config['task_name']
 
     '''2. 获取模型'''
-    model = get_model(CHOOSE_MODEL, wave=False)
+    model = get_model(CHOOSE_MODEL, wave=True)
 
     '''3. 计算模型大小，需指定输入形状 (batch, sr*time) 或 (batch, channel, f, t)'''
-    nessi.get_model_size(model, 'torch', input_size=(1, 1, 256, 44))
+    nessi.get_model_size(model, 'torch', input_size=(1, spectrum_config['sr'] * 1))
+    # nessi.get_model_size(model, 'torch', input_size=(1, 1, 256, 44))
 
     '''4. 获取数据集'''
     # 请先在dataset.datagenerator中生成数据集(h5形式)
     if DATASET_NAME == 'TAU2022_RANDOM_SLICING' or DATASET_NAME == 'tau2022_random_slicing':
-        train_dataloader, test_dataloader = dataset.datagenerator.get_tau2022_reassembled_random_slicing(mel=True)
+        train_dataloader, test_dataloader = dataset.datagenerator.get_tau2022_reassembled_random_slicing(mel=False)
     elif DATASET_NAME == 'TAU2022' or DATASET_NAME == 'tau2022':
         train_dataloader, test_dataloader = dataset.datagenerator.get_tau2022()
     elif DATASET_NAME == 'TAU2022_REASSEMBLED' or DATASET_NAME == 'tau2022_reassembled':
