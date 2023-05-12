@@ -25,9 +25,9 @@ normal_training_config = {
 }
 
 distillation_config = {
-    'task_name': 'passt+mobileastv3_light3 nomvit2 SiLU fc=128 DKD T=2 alpha=1 beta=8 MixStyle(0.3 0.6) Mixup(0.3 1) 1e-3(30) 1e-2(400)',
+    'task_name': 'passt+mobileastv3_light2 nomvit2 SiLU fc=160 DKD T=4 alpha=1 beta=10 MixStyle(0.3 0.6) Mixup(0.3 1) 1e-3(30) 1e-2(400)',
     # 任务名，用于模型文件和日志命名
-    'epoch': 600,
+    'epoch': 500,
     'start_epoch': 0,
     'hard_criterion': nn.CrossEntropyLoss(reduction='mean'),
     'soft_criterion': nn.KLDivLoss(reduction='batchmean', log_target=False),
@@ -46,9 +46,9 @@ distillation_config = {
     },
     'teacher_model': 'passt',
     'teacher_weight_path': '../model_weights/best/passt_tau2022_random_slicing_augment_fpatchout=6_mixup(alpha=0.3)_mixstyle(alpha=0.3,p=0.6)_59.87.pt',
-    'student_model': 'mobileast_light3_small',
-    'T': 2,  # 蒸馏温度
+    'student_model': 'mobileast_light2_small',
+    'T': 4,  # 蒸馏温度
     'alpha': 1,  # soft_loss损失系数（普通）， TCKD损失系数（DKD）
-    'beta': 8,  # NCKD损失系数
+    'beta': 10,  # NCKD损失系数
     'loss_device_weight': 1
 }

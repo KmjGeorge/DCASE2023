@@ -305,9 +305,9 @@ class MobileAST_Light(nn.Module):
         self.maxpool1 = nn.MaxPool2d(kernel_size=(2, 1))
         self.mvit_1 = MobileASTBlockv3(dim=32, heads=4, depth=2, channel=64, kernel_size=kernel_size,
                                        patch_size=patch_size, mlp_dim=64)
-        self.mv2_3 = MV2Block(64, 64, 1, expansion=1)
+        self.mv2_3 = MV2Block(64, 64, 2, expansion=1)
         self.conv2 = conv_1x1_bn(64, 160)
-        self.pool = nn.AvgPool2d((ih // 8, iw // 4), 1)
+        self.pool = nn.AvgPool2d((16, 8), 1)
         self.fc = nn.Linear(160, num_classes, bias=False)
 
     def fuse_model(self):
@@ -497,21 +497,6 @@ def mobileast_light4(mixstyle_conf):
         return MobileAST_Light4((256, 64), num_classes=10, kernel_size=(3, 3), patch_size=(2, 2)).to(device)
 
 
-def print_size_of_model(model):
-    import os
-    import pickle
-    import gzip
-    weights = []
-    for k, v in model.state_dict().items():
-        weights.append(v)
-    # with gzip.open("1234.p", 'wb') as f:
-    #     pickle.dump(weights, f)
-    torch.save(model.state_dict(), "temp.p")
-    print('Size (KB):', os.path.getsize("temp.p") / 1024)
-    # print('Size (MB):', os.path.getsize("1234.p") / 1e6)
-    # os.remove('temp.p')
-    # os.remove("1234.p")
-
 
 if __name__ == '__main__':
     from size_cal import nessi
@@ -527,20 +512,20 @@ if __name__ == '__main__':
     )
     import torch.ao.quantization.quantize_fx as quantize_fx
     import copy
+    from compress.quantization import print_size_of_model
     from model_src.cp_resnet import cp_resnet
 
     input_shape = (1, 1, 256, 64)
-    # model_fp32 = Test((256, 64), num_classes=10, kernel_size=(3, 3), patch_size=(2, 2))
 
-    model_fp32 = nn.Sequential(ExtractMel(**spectrum_config), MobileAST_Light4((256, 64), num_classes=10, kernel_size=(3, 3), patch_size=(2, 2)))
-    # model_fp32 = MobileAST_Light4((256, 64), num_classes=10, kernel_size=(3, 3), patch_size=(2, 2))
+    # model_fp32 = nn.Sequential(ExtractMel(**spectrum_config), MobileAST_Light2((256, 64), num_classes=10, kernel_size=(3, 3), patch_size=(2, 2)))
+    model_fp32 = MobileAST_Light((256, 64), num_classes=10, kernel_size=(3, 3), patch_size=(2, 2))
     # torch.save(model_fp32.state_dict(), '../123.pt')
     # model_fp32 = mobileast_light2(mixstyle_config)
     # model_fp32 = MobileASTBlockv3(dim=32, heads=4, depth=2, channel=32, kernel_size=(3, 3),
     #                               patch_size=(2, 2), mlp_dim=32)
     # model_fp32 = Transformer(dim=32, depth=2, heads=4, mlp_dim=32)
-    nessi.get_model_size(model_fp32, 'torch', input_size=(1, 32000))
-    assert False
+    # nessi.get_model_size(model_fp32, 'torch', input_size=(1, 32000))
+    # assert False
     # model_fp32 = cp_resnet(mixstyle_config, rho=8, cut_channels_s3=36, s2_group=2, n_blocks=(2, 1, 1))
     model_fp32.eval()
     print_size_of_model(model_fp32)

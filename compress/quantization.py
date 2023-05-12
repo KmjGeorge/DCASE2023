@@ -50,7 +50,7 @@ def quantization(model, mode, calibration_set=None, show=True, backend='x86'):
                 x = x.to('cpu')
                 x = model[0](x)
                 model_fp32_prepared(x)
-                loop.set_description('Calibration Epoch:')
+                loop.set_description('Calibration Epoch')
             print('校准完成')
         model_int8 = quantize_fx.convert_fx(model_fp32_prepared)
         if show:
@@ -68,7 +68,7 @@ def quantization(model, mode, calibration_set=None, show=True, backend='x86'):
 def print_size_of_model(model, label=""):
     torch.save(model.state_dict(), "temp.p")
     size = os.path.getsize("temp.p")
-    print('Size (KB):', size / 1e3)
+    print('Size (KB):', size / 1024)
     os.remove('temp.p')
     return size
 

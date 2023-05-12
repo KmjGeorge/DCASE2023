@@ -8,6 +8,7 @@ from dataset.augmentation import mixup, cutmix
 import pandas as pd
 from dataset.datagenerator import TAU2022_DEVICES, TAU2022_DEVICES_INVERT, TAU2022_CLASSES
 import numpy as np
+import torch.nn.functional as F
 
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
@@ -230,61 +231,3 @@ def validate(model, test_loader, criterion, device='cuda'):
 
     return test_epoch_loss, test_epoch_acc, test_device_info
 
-
-# 带TTA的验证 aug_func_list为数据增强函数列表
-def validate_with_TTA(model, test_loader, criterion, augment_func_list, device='cuda'):
-    test_correct = 0
-    test_total = 0
-    test_total_batch = 0
-    test_sum_loss = 0
-
-    test_device_info = {k: [0, 0, 0.0] for k in TAU2022_DEVICES.keys()}  # key:设备标签 v: [total_num, correct_num, acc]
-
-    model.eval()
-
-    with torch.no_grad():
-        loop = tqdm(test_loader, desc='Validation')
-        for x, y, z in loop:
-            x = x.to(device)
-            y = y.long().to(device)
-            y_pred = torch.zeros(size=(64, 10))
-            for augment in augment_func_list:
-                x_aug = augment(x)
-                y_pred += model(x_aug)
-            y_pred = y_pred / len(augment_func_list)
-            loss = criterion(y_pred, y)
-            y_ = torch.argmax(y_pred, dim=1)
-            test_correct += (y_ == y).sum().item()
-            test_total += y.size(0)
-            test_total_batch += 1
-            test_sum_loss += loss.item()
-            test_running_loss = test_sum_loss / test_total_batch
-            test_running_acc = test_correct / test_total
-
-            # 计算每个设备的准确率
-            for i, source_label in enumerate(z):
-                key = TAU2022_DEVICES_INVERT[int(source_label)]
-                test_device_info[key][0] += 1
-                if (y == y_)[i]:
-                    test_device_info[key][1] += 1
-                test_device_info[key][2] = test_device_info[key][1] / test_device_info[key][0]
-
-            # 输出验证信息
-            loop.set_postfix(val_loss=test_running_loss, val_acc=test_running_acc,
-                             A=test_device_info['a'][2],
-                             B=test_device_info['b'][2],
-                             C=test_device_info['c'][2],
-                             S1=test_device_info['s1'][2],
-                             S2=test_device_info['s2'][2],
-                             S3=test_device_info['s3'][2],
-                             S4=test_device_info['s4'][2],
-                             S5=test_device_info['s5'][2],
-                             S6=test_device_info['s6'][2],
-                             )
-
-    test_epoch_loss = test_sum_loss / test_total_batch
-    test_epoch_acc = test_correct / test_total
-
-    model.train()
-
-    return test_epoch_loss, test_epoch_acc, test_device_info
