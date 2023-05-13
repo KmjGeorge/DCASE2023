@@ -34,6 +34,8 @@ TAU2022_CLASSES = {'airport': 0,
                    'street_traffic': 8,
                    'tram': 9
                    }
+
+TAU2022_CLASSES_INVERT = {k: v for v, k in TAU2022_CLASSES.items()}
 TAU2022_DEVICES = {'a': 0,
                    'b': 1,
                    'c': 2,
@@ -88,11 +90,6 @@ class TAU2022(Dataset):
 
 
 class TAU2022_Caliburation(Dataset):
-    """
-    :param slicing: 是否切片（需确保数据集是10s的）
-    :param mel: True返回频谱， False返回波形
-    """
-
     def __init__(self, h5_path, dataset_size):
         assert (
                 DATASET_NAME == 'TAU2022' or DATASET_NAME == 'tau2022' or DATASET_NAME == 'TAU2022_RANDOM_SLICING' or DATASET_NAME == 'tau2022_random_slicing'
@@ -112,6 +109,24 @@ class TAU2022_Caliburation(Dataset):
     def __getitem__(self, idx):
         audio = self.X[idx]
         return audio
+
+
+class TAU2022_Evaluation(Dataset):
+    def __init__(self, h5_path):
+        print('加载评估集...')
+        self.X = []
+        self.filename = []
+        with h5py.File(h5_path, 'r') as f:
+            self.X = f['data'][:]
+            self.filename = f['filename'][:]
+
+    def __len__(self):
+        return len(self.X)
+
+    def __getitem__(self, idx):
+        audio = self.X[idx]
+        filename = self.filename[idx]
+        return audio, filename
 
 
 # 构建tau2022数据集 以h5存储 包括：数据(波形) 类别标签 设备标签
@@ -180,6 +195,27 @@ def make_tau2022_per_class(meta_path, h5_path, scene_class, reassembled=False):
     print('制作h5数据集完成，保存至 {}'.format(h5_path_per_class))
 
 
+def make_tau2022_evaluation(eva_path='D:/Datasets/TAU-urban-acoustic-scenes-2023-mobile-evaluation/',
+                            h5_path='D:/github/DCASE2023/dataset/h5/dcase2023_eva.h5'):
+    assert not os.path.exists(h5_path), "文件{}已存在！".format(h5_path)
+    meta_path = os.path.join(eva_path, 'evaluation_setup/fold1_test.csv')
+    df = pd.read_csv(meta_path)
+    filename = []
+    X = []
+    loop = tqdm(df['filename'])
+    for file in loop:
+        full_path = os.path.join(eva_path, file)
+        audio, _ = librosa.load(full_path, sr=SR)
+        X.append(audio)
+        filename.append(int(os.path.split(file)[1].rstrip('.wav')))
+        loop.set_description('从audio文件读取数据集...')
+    print('制作h5数据集中，可能需要数分钟时间...')
+    with h5py.File(h5_path, 'a') as f:
+        f.create_dataset('data', data=X)
+        f.create_dataset('filename', data=filename)
+    print('制作h5数据集完成，保存至 {}'.format(h5_path))
+
+
 # 获取原版tau2022数据集
 def get_tau2022(mel=False):
     train_h5 = os.path.join(H5PATH, 'tau2022_train.h5')
@@ -224,6 +260,13 @@ def get_valset():
     return valset_list
 
 
+def get_evaset():
+    eva_h5 = os.path.join(H5PATH, 'dcase2023_eva.h5')
+    eva_dataset = TAU2022_Evaluation(eva_h5)
+    eva_dataloader = DataLoader(eva_dataset, batch_size=1, shuffle=False)
+    return eva_dataloader
+
+
 # 用于量化的校准集，为训练集的子集
 def get_calibration_set(length):
     h5 = os.path.join(H5PATH, 'tau2022_train.h5')
@@ -232,73 +275,16 @@ def get_calibration_set(length):
 
 
 if __name__ == '__main__':
+    # train_h5 = os.path.join(H5PATH, 'tau2022_train.h5')
+    # test_h5 = os.path.join(H5PATH, 'tau2022_test.h5')
+    # train_csv = os.path.split(META_PATH)[0] + '/evaluation_setup/fold1_train.csv'
+    # test_csv = os.path.split(META_PATH)[0] + '/evaluation_setup/fold1_evaluate.csv'
+    # # make_tau2022_per_class(train_csv, train_h5, scene_class='airport', reassembled=False)
+    # for k in TAU2022_CLASSES.keys():
+    #     try:
+    #         make_tau2022_per_class(test_csv, test_h5, scene_class=k, reassembled=False)
+    #     except:
+    #         pass
 
-    train_h5 = os.path.join(H5PATH, 'tau2022_train.h5')
-    test_h5 = os.path.join(H5PATH, 'tau2022_test.h5')
-    train_csv = os.path.split(META_PATH)[0] + '/evaluation_setup/fold1_train.csv'
-    test_csv = os.path.split(META_PATH)[0] + '/evaluation_setup/fold1_evaluate.csv'
-    # make_tau2022_per_class(train_csv, train_h5, scene_class='airport', reassembled=False)
-    for k in TAU2022_CLASSES.keys():
-        try:
-            make_tau2022_per_class(test_csv, test_h5, scene_class=k, reassembled=False)
-        except:
-            pass
-
-    '''
-    # 原版TAU2022数据集调用
-    TAU2022_train, TAU2022_test = get_tau2022()
-    i = 0
-    # 输出一批数据的shape
-    for x, y, z in TAU2022_train:
-        if i == 1:
-            break
-        print(x.shape)
-        print(y.shape)
-        print(z.shape)
-        # print(x)
-        # print(y)
-        i += 1
-    '''
-    '''
-    # TAU2022_reassembled数据集调用
-    TAU2022_reassembled_train, TAU2022_reassembled_test = get_tau2022_reassembled()
-    i = 0
-    # 输出一批数据的shape
-    from run.testscript import plot_waveform
-
-    for x, y, z in TAU2022_reassembled_train:
-        if i == 1:
-            break
-        plot_waveform(torch.unsqueeze(x[0], dim=0), sample_rate=32000)
-        print(y[0])
-        print(z[0])
-        i += 1
-    '''
-
-    '''
-    # random_slicing数据集调用
-    Random_Slicing_train, Random_Slicing_test = get_tau2022_reassembled_random_slicing()
-    i = 0
-    # 输出一批数据的shape
-    for x, y in Random_Slicing_train:
-        if i == 1:
-            break
-        print(x.shape)
-        print(y.shape)
-        # print(x)
-        # print(y)
-        i += 1
-    '''
-
-    ''' urbansound8k 测试用
-    Urbansound8k_train, UrbanSound8K_test = get_urbansound8k(fold_shuffle)
-    i = 0
-    for x, y in Urbansound8k_train:
-        if i == 1:
-            break
-        print(x)
-        print(y)
-        print(x.shape)
-        print(y.shape)
-        i += 1
-    '''
+    make_tau2022_evaluation(eva_path='D:/Datasets/TAU-urban-acoustic-scenes-2023-mobile-evaluation',
+                            h5_path='D:/github/DCASE2023/dataset/h5/dcase2023_eva.h5')
