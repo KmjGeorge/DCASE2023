@@ -4,7 +4,6 @@ import matplotlib.pyplot as plt
 import torch.nn as nn
 import random
 import numpy as np
-
 from model_src.cp_resnet import cp_resnet
 from model_src.cp_resnet_freq_damp import get_model_based_on_rho
 from model_src.mobilevit import mobileast_light2, mobileast_light, mobileast_cpresnet2, mobileast_cpresnet
@@ -26,30 +25,30 @@ def get_model(name, wave=True):
                                             n_blocks=(2, 1, 1))).to(device)
         else:
             model = cp_resnet(mixstyle_config, rho=8, s2_group=2, cut_channels_s3=36, n_blocks=(2, 1, 1)).to(device)
-    elif name == 'mobileast_light':
-        if wave:
-            model = nn.Sequential(ExtractMel(**spectrum_config), mobileast_light(mixstyle_conf=mixstyle_config)).to(
-                device)
-        else:
-            model = mobileast_light(mixstyle_conf=mixstyle_config).to(device)
-    elif name == 'mobileast_light2':
-        if wave:
-            model = nn.Sequential(ExtractMel(**spectrum_config), mobileast_light2(mixstyle_conf=mixstyle_config)).to(
-                device)
-        else:
-            model = mobileast_light2(mixstyle_conf=mixstyle_config).to(device)
-    elif name == 'mobileast_cpresnet':
-        if wave:
-            model = nn.Sequential(ExtractMel(**spectrum_config), mobileast_cpresnet(mixstyle_conf=mixstyle_config)).to(
-                device)
-        else:
-            model = mobileast_cpresnet(mixstyle_conf=mixstyle_config).to(device)
-    elif name == 'mobileast_cpresnet2':
-        if wave:
-            model = nn.Sequential(ExtractMel(**spectrum_config), mobileast_cpresnet2(mixstyle_conf=mixstyle_config)).to(
-                device)
-        else:
-            model = mobileast_cpresnet2(mixstyle_conf=mixstyle_config).to(device)
+    # elif name == 'mobileast_light':
+    #     if wave:
+    #         model = nn.Sequential(ExtractMel(**spectrum_config), mobileast_light(mixstyle_conf=mixstyle_config)).to(
+    #             device)
+    #     else:
+    #         model = mobileast_light(mixstyle_conf=mixstyle_config).to(device)
+    # elif name == 'mobileast_light2':
+    #     if wave:
+    #         model = nn.Sequential(ExtractMel(**spectrum_config), mobileast_light2(mixstyle_conf=mixstyle_config)).to(
+    #             device)
+    #     else:
+    #         model = mobileast_light2(mixstyle_conf=mixstyle_config).to(device)
+    # elif name == 'mobileast_cpresnet':
+    #     if wave:
+    #         model = nn.Sequential(ExtractMel(**spectrum_config), mobileast_cpresnet(mixstyle_conf=mixstyle_config)).to(
+    #             device)
+    #     else:
+    #         model = mobileast_cpresnet(mixstyle_conf=mixstyle_config).to(device)
+    # elif name == 'mobileast_cpresnet2':
+    #     if wave:
+    #         model = nn.Sequential(ExtractMel(**spectrum_config), mobileast_cpresnet2(mixstyle_conf=mixstyle_config)).to(
+    #             device)
+    #     else:
+    #         model = mobileast_cpresnet2(mixstyle_conf=mixstyle_config).to(device)
     elif name == 'passt':
         model = passt(mixstyle_conf=mixstyle_config, pretrained_local=False, n_classes=10).to(device)
     elif name == 'damped_cp_resnet':
@@ -63,23 +62,10 @@ def get_model(name, wave=True):
                                            n_classes=10).to(device)
     elif name == 'mobileast_light_small':
         if wave:
-            model = nn.Sequential(ExtractMel(**spectrum_config), model_src.quant_mobilevit.mobileast_light(mixstyle_conf=mixstyle_config)).to(
+            model = nn.Sequential(ExtractMel(**spectrum_config), model_src.quant_mobilevit.mobileast_light(mixstyle_conf=mixstyle_config,  mobileast_config=mobileast_light_config)).to(
                 device)
         else:
             model = model_src.quant_mobilevit.mobileast_light(mixstyle_conf=mixstyle_config).to(device)
-    elif name == 'mobileast_light2_small':
-        if wave:
-            model = nn.Sequential(ExtractMel(**spectrum_config), model_src.quant_mobilevit.mobileast_light2(mixstyle_conf=mixstyle_config)).to(
-                device)
-        else:
-            model = model_src.quant_mobilevit.mobileast_light2(mixstyle_conf=mixstyle_config).to(device)
-
-    elif name == 'mobileast_light3_small':
-        if wave:
-            model = nn.Sequential(ExtractMel(**spectrum_config), model_src.quant_mobilevit.mobileast_light3(mixstyle_conf=mixstyle_config)).to(
-                device)
-        else:
-            model = model_src.quant_mobilevit.mobileast_light3(mixstyle_conf=mixstyle_config).to(device)
     elif name == 'mobileast_light4_small':
         if wave:
             model = nn.Sequential(ExtractMel(**spectrum_config), model_src.quant_mobilevit.mobileast_light4(mixstyle_conf=mixstyle_config)).to(
@@ -126,6 +112,7 @@ if __name__ == '__main__':
     from configs.trainingconfig import distillation_config
     from configs.mixup import mixup_config
     from configs.mixstyle import mixstyle_config
+    from configs.mobileastconfig import mobileast_light_config
 
     # 固定种子
     setup_seed(200)
@@ -149,7 +136,6 @@ if __name__ == '__main__':
     '''3. 计算模型大小，需指定输入形状 (batch, sr*time) '''
     nessi.get_model_size(teacher, 'torch', input_size=(1, spectrum_config['sr'] * 1))
     nessi.get_model_size(student, 'torch', input_size=(1, spectrum_config['sr'] * 1))
-
 
     '''4. 获取数据集'''
     # 请先在dataset.datagenerator中生成数据集(h5形式)
